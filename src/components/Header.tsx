@@ -11,6 +11,9 @@ export function Header() {
           <Link to="/" activeOptions={{ exact: true }} activeProps={{ className: "text-primary" }} className="text-foreground/80 hover:text-primary transition">
             Catálogo
           </Link>
+          <Link to="/adicionar" activeProps={{ className: "text-primary" }} className="text-foreground/80 hover:text-primary transition">
+            Adicionar
+          </Link>
           <Link to="/validar" activeProps={{ className: "text-primary" }} className="text-foreground/80 hover:text-primary transition">
             Validar
           </Link>
