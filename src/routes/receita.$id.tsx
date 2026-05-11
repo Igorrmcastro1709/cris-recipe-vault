@@ -69,7 +69,7 @@ export const Route = createFileRoute("/receita/$id")({
 });
 
 function RecipeDetail() {
-  const { recipe } = Route.useLoaderData();
+  const { recipe } = Route.useLoaderData() as { recipe: Recipe };
   const { meta, toggleStatus, setRating } = useRecipeMeta(recipe.id);
   const { icon: SourceIcon, label: sourceLabel } = sourceMeta[recipe.source];
   const [checked, setChecked] = useState<Record<number, boolean>>({});
