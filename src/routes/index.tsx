@@ -5,6 +5,9 @@ import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
 import { FilterChips, type ChipOption } from "@/components/FilterChips";
 import { recipes, type SourceType } from "@/lib/recipes";
+import { useAllUserMeta } from "@/lib/user-meta";
+
+type StatusFilter = "all" | "favorita" | "quero-testar" | "ja-fiz" | "avaliadas";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,6 +31,8 @@ function Index() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
   const [src, setSrc] = useState<SourceType | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const userMeta = useAllUserMeta();
 
   const categoryOptions = useMemo<ChipOption[]>(() => {
     const counts = new Map<string, number>();
@@ -51,11 +56,29 @@ function Index() {
     ];
   }, []);
 
+  const statusOptions = useMemo<ChipOption[]>(() => {
+    const count = (predicate: (id: string) => boolean) =>
+      recipes.filter((r) => predicate(r.id)).length;
+    return [
+      { value: "all", label: "Todas" },
+      { value: "favorita", label: "Favoritas", count: count((id) => userMeta[id]?.status === "favorita") },
+      { value: "quero-testar", label: "Quero testar", count: count((id) => userMeta[id]?.status === "quero-testar") },
+      { value: "ja-fiz", label: "Já fiz", count: count((id) => userMeta[id]?.status === "ja-fiz") },
+      { value: "avaliadas", label: "Avaliadas", count: count((id) => (userMeta[id]?.rating ?? 0) > 0) },
+    ];
+  }, [userMeta]);
+
   const filtered = useMemo(() => {
     const query = q.toLowerCase().trim();
-    return recipes.filter((r) => {
+    const list = recipes.filter((r) => {
       if (cat !== "all" && r.category !== cat) return false;
       if (src !== "all" && r.source !== src) return false;
+      if (statusFilter !== "all") {
+        const m = userMeta[r.id];
+        if (statusFilter === "avaliadas") {
+          if (!m || m.rating <= 0) return false;
+        } else if (m?.status !== statusFilter) return false;
+      }
       if (!query) return true;
       return (
         r.title.toLowerCase().includes(query) ||
@@ -63,14 +86,20 @@ function Index() {
         r.ingredients.some((i) => i.toLowerCase().includes(query))
       );
     });
-  }, [q, cat, src]);
+    if (statusFilter === "avaliadas") {
+      return [...list].sort((a, b) => (userMeta[b.id]?.rating ?? 0) - (userMeta[a.id]?.rating ?? 0));
+    }
+    return list;
+  }, [q, cat, src, statusFilter, userMeta]);
 
-  const hasActiveFilter = q.trim() !== "" || cat !== "all" || src !== "all";
+  const hasActiveFilter = q.trim() !== "" || cat !== "all" || src !== "all" || statusFilter !== "all";
   const clearFilters = () => {
     setQ("");
     setCat("all");
     setSrc("all");
+    setStatusFilter("all");
   };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -122,6 +151,11 @@ function Index() {
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Fonte</p>
             <FilterChips label="Filtrar por fonte" options={sourceOptions} value={src} onChange={(v) => setSrc(v as SourceType | "all")} />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Minhas marcações</p>
+            <FilterChips label="Filtrar pelas minhas marcações" options={statusOptions} value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)} />
           </div>
         </div>
       </search>
