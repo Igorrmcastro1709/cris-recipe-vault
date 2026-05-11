@@ -5,6 +5,9 @@ import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
 import { FilterChips, type ChipOption } from "@/components/FilterChips";
 import { recipes, type SourceType } from "@/lib/recipes";
+import { useAllUserMeta } from "@/lib/user-meta";
+
+type StatusFilter = "all" | "favorita" | "quero-testar" | "ja-fiz" | "avaliadas";
 
 export const Route = createFileRoute("/")({
   head: () => ({
