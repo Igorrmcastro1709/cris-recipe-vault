@@ -152,6 +152,11 @@ function Index() {
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Fonte</p>
             <FilterChips label="Filtrar por fonte" options={sourceOptions} value={src} onChange={(v) => setSrc(v as SourceType | "all")} />
           </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Minhas marcações</p>
+            <FilterChips label="Filtrar pelas minhas marcações" options={statusOptions} value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)} />
+          </div>
         </div>
       </search>
 
