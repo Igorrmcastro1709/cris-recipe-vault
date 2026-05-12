@@ -206,32 +206,21 @@ function Adicionar() {
   // Switch mode: re-init defaults appropriate to the mode
   const switchMode = (next: "quick" | "full") => {
     setMode(next);
-    if (next === "full") {
-      reset({
-        mode: "full",
-        title: values.title ?? "",
-        category: values.category ?? "",
-        source: (values.source as SourceType) ?? "instagram",
-        sourceUrl: values.sourceUrl ?? "",
-        image: "",
-        time: "",
-        difficulty: "Fácil",
-        servings: undefined,
-        tagsInput: "",
-        ingredients: [{ value: "" }],
-        steps: [{ value: "" }],
-        notes: values.notes ?? "",
-      } as FormValues);
-    } else {
-      reset({
-        mode: "quick",
-        title: values.title ?? "",
-        category: values.category ?? "",
-        source: (values.source as SourceType) ?? "instagram",
-        sourceUrl: values.sourceUrl ?? "",
-        notes: values.notes ?? "",
-      } as FormValues);
-    }
+    const base = {
+      mode: next,
+      title: values.title ?? "",
+      category: values.category ?? "",
+      source: (values.source as SourceType) ?? "instagram",
+      sourceUrl: values.sourceUrl ?? "",
+      notes: values.notes ?? "",
+      image: "",
+      time: "",
+      difficulty: "Fácil" as const,
+      tagsInput: "",
+      ingredients: next === "full" ? [{ value: "" }] : [],
+      steps: next === "full" ? [{ value: "" }] : [],
+    };
+    reset(base);
   };
 
   const persist = (next: SavedDraft[]) => {
