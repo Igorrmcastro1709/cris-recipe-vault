@@ -165,7 +165,7 @@ function Adicionar() {
     },
   });
 
-  const { control, register, handleSubmit, watch, reset, setValue, formState } = form;
+  const { control, register, handleSubmit, watch, reset, formState } = form;
   const values = watch();
 
   const ingredientsArray = useFieldArray({ control, name: "ingredients" as never });
