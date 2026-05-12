@@ -84,43 +84,47 @@ const sourceOptions: {
 
 const sourceValues = sourceOptions.map((s) => s.value) as [SourceType, ...SourceType[]];
 
-const quickSchema = z.object({
-  mode: z.literal("quick"),
-  title: z.string().trim().min(1, "Dê um nome para a receita").max(120),
-  category: z.string().trim().min(1, "Escolha ou crie uma categoria").max(60),
-  source: z.enum(sourceValues),
-  sourceUrl: z.string().trim().url("Cole um link válido (começando com http)"),
-  notes: z.string().max(1000).optional().default(""),
-});
+const schema = z
+  .object({
+    mode: z.enum(["quick", "full"]),
+    title: z.string().trim().min(1, "Dê um nome para a receita").max(120),
+    category: z.string().trim().min(1, "Escolha ou crie uma categoria").max(60),
+    source: z.enum(sourceValues),
+    sourceUrl: z.string().trim().url("Cole um link válido (começando com http)"),
+    image: z
+      .string()
+      .trim()
+      .url("Use uma URL de imagem válida")
+      .or(z.literal(""))
+      .optional()
+      .default(""),
+    time: z.string().max(20).optional().default(""),
+    difficulty: z.enum(["Fácil", "Médio", "Difícil"]).default("Fácil"),
+    servings: z.coerce.number().int().min(1).max(50).optional(),
+    tagsInput: z.string().max(200).optional().default(""),
+    ingredients: z
+      .array(z.object({ value: z.string().trim().min(1, "Ingrediente vazio") }))
+      .default([]),
+    steps: z
+      .array(z.object({ value: z.string().trim().min(1, "Passo vazio") }))
+      .default([]),
+    notes: z.string().max(1000).optional().default(""),
+  })
+  .superRefine((data, ctx) => {
+    if (data.mode !== "full") return;
+    if (!data.time?.trim())
+      ctx.addIssue({ code: "custom", path: ["time"], message: "Informe o tempo (ex.: 30min)" });
+    if (!data.ingredients.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["ingredients"],
+        message: "Adicione pelo menos um ingrediente",
+      });
+    if (!data.steps.length)
+      ctx.addIssue({ code: "custom", path: ["steps"], message: "Adicione pelo menos um passo" });
+  });
 
-const fullSchema = z.object({
-  mode: z.literal("full"),
-  title: z.string().trim().min(1, "Dê um nome para a receita").max(120),
-  category: z.string().trim().min(1, "Escolha ou crie uma categoria").max(60),
-  source: z.enum(sourceValues),
-  sourceUrl: z.string().trim().url("Cole um link válido"),
-  image: z
-    .string()
-    .trim()
-    .url("Use uma URL de imagem válida")
-    .or(z.literal(""))
-    .optional()
-    .default(""),
-  time: z.string().trim().min(1, "Informe o tempo (ex.: 30min)").max(20),
-  difficulty: z.enum(["Fácil", "Médio", "Difícil"]),
-  servings: z.coerce.number().int().min(1).max(50).optional(),
-  tagsInput: z.string().max(200).optional().default(""),
-  ingredients: z
-    .array(z.object({ value: z.string().trim().min(1, "Ingrediente vazio") }))
-    .min(1, "Adicione pelo menos um ingrediente"),
-  steps: z
-    .array(z.object({ value: z.string().trim().min(1, "Passo vazio") }))
-    .min(1, "Adicione pelo menos um passo"),
-  notes: z.string().max(1000).optional().default(""),
-});
-
-const schema = z.discriminatedUnion("mode", [quickSchema, fullSchema]);
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.input<typeof schema>;
 
 const PLACEHOLDER_IMG =
   "https://images.unsplash.com/photo-1495546200529-39e0e3825bdc?w=800";
