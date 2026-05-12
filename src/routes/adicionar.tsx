@@ -422,7 +422,7 @@ function Adicionar() {
               </Field>
             </div>
 
-            {mode === "full" && values.mode === "full" && (
+            {mode === "full" && (
               <>
                 <Field
                   label="Imagem (URL)"
