@@ -147,7 +147,7 @@ function Adicionar() {
   );
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as never,
     mode: "onBlur",
     defaultValues: {
       mode: "quick",
@@ -155,8 +155,14 @@ function Adicionar() {
       category: "",
       source: "instagram",
       sourceUrl: "",
+      image: "",
+      time: "",
+      difficulty: "Fácil",
+      tagsInput: "",
+      ingredients: [],
+      steps: [],
       notes: "",
-    } as FormValues,
+    },
   });
 
   const { control, register, handleSubmit, watch, reset, setValue, formState } = form;
