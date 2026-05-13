@@ -576,7 +576,7 @@ function Adicionar() {
               <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
                 {saved ? (
                   <span className="inline-flex items-center gap-1 text-primary font-medium">
-                    <Check size={14} aria-hidden="true" /> Rascunho salvo
+                    <Check size={14} aria-hidden="true" /> Receita enviada para validação
                   </span>
                 ) : autosavedAt ? (
                   <>
@@ -587,7 +587,7 @@ function Adicionar() {
                     })}
                   </>
                 ) : (
-                  "Salvo localmente no seu navegador"
+                  "Suas alterações ficam salvas localmente até você enviar"
                 )}
               </p>
               <div className="flex items-center gap-2">
@@ -602,13 +602,19 @@ function Adicionar() {
                 )}
                 <button
                   type="submit"
-                  disabled={formState.isSubmitting}
+                  disabled={submitMutation.isPending}
                   className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-60"
                 >
-                  <Plus size={16} aria-hidden="true" /> Salvar receita
+                  <Plus size={16} aria-hidden="true" /> {submitMutation.isPending ? "Enviando…" : "Salvar receita"}
                 </button>
               </div>
             </div>
+
+            {submitError && (
+              <p role="alert" className="text-sm text-destructive inline-flex items-center gap-1.5">
+                <AlertCircle size={14} aria-hidden="true" /> {submitError}
+              </p>
+            )}
           </form>
 
           {/* PREVIEW */}
@@ -637,53 +643,45 @@ function Adicionar() {
           </aside>
         </div>
 
-        {/* DRAFTS */}
+        {/* PENDING (recently submitted, awaiting validation) */}
         <section className="mt-14">
           <div className="flex items-baseline justify-between mb-4">
-            <h2 className="font-serif text-2xl font-bold">Rascunhos</h2>
-            <span className="text-sm text-muted-foreground">
-              {drafts.length} item{drafts.length === 1 ? "" : "s"}
-            </span>
+            <h2 className="font-serif text-2xl font-bold">Aguardando validação</h2>
+            <Link to="/validar" className="text-sm text-primary hover:underline font-medium">
+              Ir para validação →
+            </Link>
           </div>
-          {drafts.length === 0 ? (
+          {pendingRecipes.length === 0 ? (
             <p className="text-muted-foreground text-sm bg-card border border-dashed border-border rounded-2xl p-6 text-center">
-              Nenhum rascunho ainda. Cadastre a primeira receita acima.
+              Nenhuma receita pendente. Cadastre a primeira acima.
             </p>
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {drafts.map((d) => {
-                const opt = sourceOptions.find((o) => o.value === d.data.source)!;
+              {pendingRecipes.map((r) => {
+                const opt = sourceOptions.find((o) => o.value === r.source)!;
                 const Icon = opt.icon;
                 return (
                   <li
-                    key={d.id}
+                    key={r.id}
                     className="bg-card border border-border/60 rounded-2xl p-4 flex items-start gap-3"
                   >
                     <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                       <Icon size={16} aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{d.data.title}</p>
+                      <p className="font-medium text-foreground truncate">{r.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {d.data.category} • {opt.label}
-                        {d.data.mode === "full" ? " • completa" : " • rápida"}
+                        {r.category} • {opt.label}
                       </p>
                       <a
-                        href={d.data.sourceUrl}
+                        href={r.sourceUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="text-xs text-primary hover:underline break-all"
                       >
-                        {d.data.sourceUrl}
+                        {r.sourceUrl}
                       </a>
                     </div>
-                    <button
-                      onClick={() => removeDraft(d.id)}
-                      className="shrink-0 p-2 text-muted-foreground hover:text-destructive transition"
-                      aria-label={`Remover rascunho ${d.data.title}`}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                    </button>
                   </li>
                 );
               })}
