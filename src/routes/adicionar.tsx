@@ -137,14 +137,25 @@ interface SavedDraft {
 }
 
 function Adicionar() {
+  const qc = useQueryClient();
   const [mode, setMode] = useState<"quick" | "full">("quick");
-  const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [saved, setSaved] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [autosavedAt, setAutosavedAt] = useState<number | null>(null);
 
+  const { data: allRecipes = [] } = useQuery({
+    queryKey: ["recipes", "all"],
+    queryFn: () => fetchRecipes(),
+  });
+
   const existingCategories = useMemo(
-    () => Array.from(new Set(recipes.map((r) => r.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
-    [],
+    () => Array.from(new Set(allRecipes.map((r) => r.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [allRecipes],
+  );
+
+  const pendingRecipes = useMemo(
+    () => allRecipes.filter((r) => !r.validated).slice(0, 8),
+    [allRecipes],
   );
 
   const form = useForm<FormValues>({
@@ -172,11 +183,9 @@ function Adicionar() {
   const ingredientsArray = useFieldArray({ control, name: "ingredients" as never });
   const stepsArray = useFieldArray({ control, name: "steps" as never });
 
-  // Load drafts + autosave on mount
+  // Restore autosave on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setDrafts(JSON.parse(raw));
       const auto = localStorage.getItem(AUTOSAVE_KEY);
       if (auto) {
         const parsed = JSON.parse(auto);
@@ -224,30 +233,52 @@ function Adicionar() {
     reset(base);
   };
 
-  const persist = (next: SavedDraft[]) => {
-    setDrafts(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* noop */
-    }
-  };
+  const submitMutation = useMutation({
+    mutationFn: async (data: FormValues) => {
+      const isFull = data.mode === "full";
+      const tags = isFull
+        ? (data.tagsInput ?? "")
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
+      return createRecipe({
+        title: data.title.trim(),
+        category: data.category.trim(),
+        source: data.source as SourceType,
+        sourceUrl: data.sourceUrl.trim(),
+        image: isFull ? (data.image || "").trim() : "",
+        time: isFull ? (data.time || "").trim() : "",
+        difficulty: isFull ? data.difficulty : "Fácil",
+        servings: isFull ? data.servings ?? null : null,
+        tags,
+        ingredients: isFull ? (data.ingredients ?? []).map((i) => i.value).filter(Boolean) : [],
+        steps: isFull ? (data.steps ?? []).map((s) => s.value).filter(Boolean) : [],
+        notes: (data.notes ?? "").trim() || null,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["recipes"] });
+      try {
+        localStorage.removeItem(AUTOSAVE_KEY);
+      } catch {
+        /* noop */
+      }
+      setAutosavedAt(null);
+      setSaved(true);
+      setSubmitError(null);
+      setTimeout(() => setSaved(false), 2800);
+      switchMode(mode); // clean state
+    },
+    onError: (err: unknown) => {
+      setSubmitError(err instanceof Error ? err.message : "Erro ao salvar receita");
+    },
+  });
 
   const onSubmit = (data: FormValues) => {
-    const draft: SavedDraft = { id: crypto.randomUUID(), createdAt: Date.now(), data };
-    persist([draft, ...drafts]);
-    try {
-      localStorage.removeItem(AUTOSAVE_KEY);
-    } catch {
-      /* noop */
-    }
-    setAutosavedAt(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2400);
-    switchMode(mode); // reset to clean state in same mode
+    setSubmitError(null);
+    submitMutation.mutate(data);
   };
-
-  const removeDraft = (id: string) => persist(drafts.filter((d) => d.id !== id));
 
   const currentSource =
     sourceOptions.find((o) => o.value === values.source) ?? sourceOptions[0];
