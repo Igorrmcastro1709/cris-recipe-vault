@@ -130,11 +130,6 @@ type FormValues = z.input<typeof schema>;
 const PLACEHOLDER_IMG =
   "https://images.unsplash.com/photo-1495546200529-39e0e3825bdc?w=800";
 
-interface SavedDraft {
-  id: string;
-  createdAt: number;
-  data: FormValues;
-}
 
 function Adicionar() {
   const qc = useQueryClient();
