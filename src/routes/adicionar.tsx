@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   Instagram,
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
-import { recipes, type Recipe, type SourceType } from "@/lib/recipes";
+import { createRecipe, fetchRecipes, type Recipe, type SourceType } from "@/lib/recipes";
 
 export const Route = createFileRoute("/adicionar")({
   head: () => ({
