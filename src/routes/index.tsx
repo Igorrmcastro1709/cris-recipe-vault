@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, X, Loader2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
 import { FilterChips, type ChipOption } from "@/components/FilterChips";
-import { recipes, type SourceType } from "@/lib/recipes";
+import { fetchRecipes, type SourceType } from "@/lib/recipes";
 import { useAllUserMeta } from "@/lib/user-meta";
 
 type StatusFilter = "all" | "favorita" | "quero-testar" | "ja-fiz" | "avaliadas";
@@ -34,6 +35,11 @@ function Index() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const userMeta = useAllUserMeta();
 
+  const { data: recipes = [], isLoading, error } = useQuery({
+    queryKey: ["recipes", "validated"],
+    queryFn: () => fetchRecipes({ onlyValidated: true }),
+  });
+
   const categoryOptions = useMemo<ChipOption[]>(() => {
     const counts = new Map<string, number>();
     recipes.forEach((r) => counts.set(r.category, (counts.get(r.category) ?? 0) + 1));
@@ -43,7 +49,7 @@ function Index() {
         .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
         .map(([value, count]) => ({ value, label: value, count })),
     ];
-  }, []);
+  }, [recipes]);
 
   const sourceOptions = useMemo<ChipOption[]>(() => {
     const counts = new Map<SourceType, number>();
@@ -54,7 +60,7 @@ function Index() {
         .filter((s) => counts.has(s))
         .map((s) => ({ value: s, label: sourceLabels[s], count: counts.get(s) ?? 0 })),
     ];
-  }, []);
+  }, [recipes]);
 
   const statusOptions = useMemo<ChipOption[]>(() => {
     const count = (predicate: (id: string) => boolean) =>
@@ -66,7 +72,7 @@ function Index() {
       { value: "ja-fiz", label: "Já fiz", count: count((id) => userMeta[id]?.status === "ja-fiz") },
       { value: "avaliadas", label: "Avaliadas", count: count((id) => (userMeta[id]?.rating ?? 0) > 0) },
     ];
-  }, [userMeta]);
+  }, [userMeta, recipes]);
 
   const filtered = useMemo(() => {
     const query = q.toLowerCase().trim();
@@ -90,7 +96,7 @@ function Index() {
       return [...list].sort((a, b) => (userMeta[b.id]?.rating ?? 0) - (userMeta[a.id]?.rating ?? 0));
     }
     return list;
-  }, [q, cat, src, statusFilter, userMeta]);
+  }, [q, cat, src, statusFilter, userMeta, recipes]);
 
   const hasActiveFilter = q.trim() !== "" || cat !== "all" || src !== "all" || statusFilter !== "all";
   const clearFilters = () => {
@@ -99,7 +105,6 @@ function Index() {
     setSrc("all");
     setStatusFilter("all");
   };
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -178,7 +183,16 @@ function Index() {
             )}
           </div>
         </div>
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
+            <Loader2 size={18} className="animate-spin" aria-hidden="true" /> Carregando receitas…
+          </div>
+        ) : error ? (
+          <div className="text-center py-16 border border-dashed border-destructive/40 rounded-2xl bg-destructive/5">
+            <p className="text-destructive font-medium">Não consegui carregar o catálogo.</p>
+            <p className="text-sm text-muted-foreground mt-1">Tente recarregar a página em alguns instantes.</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16 sm:py-20 border border-dashed border-border rounded-2xl bg-card/50">
             <p className="font-serif text-xl font-bold text-foreground">Nada encontrado por aqui.</p>
             <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">

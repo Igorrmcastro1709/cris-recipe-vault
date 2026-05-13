@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   Instagram,
@@ -19,7 +20,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
-import { recipes, type Recipe, type SourceType } from "@/lib/recipes";
+import { createRecipe, fetchRecipes, type Recipe, type SourceType } from "@/lib/recipes";
 
 export const Route = createFileRoute("/adicionar")({
   head: () => ({
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/adicionar")({
   component: Adicionar,
 });
 
-const STORAGE_KEY = "receitas-da-cris:drafts-v2";
+
 const AUTOSAVE_KEY = "receitas-da-cris:form-autosave";
 
 const sourceOptions: {
@@ -129,21 +130,27 @@ type FormValues = z.input<typeof schema>;
 const PLACEHOLDER_IMG =
   "https://images.unsplash.com/photo-1495546200529-39e0e3825bdc?w=800";
 
-interface SavedDraft {
-  id: string;
-  createdAt: number;
-  data: FormValues;
-}
 
 function Adicionar() {
+  const qc = useQueryClient();
   const [mode, setMode] = useState<"quick" | "full">("quick");
-  const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [saved, setSaved] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [autosavedAt, setAutosavedAt] = useState<number | null>(null);
 
+  const { data: allRecipes = [] } = useQuery({
+    queryKey: ["recipes", "all"],
+    queryFn: () => fetchRecipes(),
+  });
+
   const existingCategories = useMemo(
-    () => Array.from(new Set(recipes.map((r) => r.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
-    [],
+    () => Array.from(new Set(allRecipes.map((r) => r.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [allRecipes],
+  );
+
+  const pendingRecipes = useMemo(
+    () => allRecipes.filter((r) => !r.validated).slice(0, 8),
+    [allRecipes],
   );
 
   const form = useForm<FormValues>({
@@ -171,11 +178,9 @@ function Adicionar() {
   const ingredientsArray = useFieldArray({ control, name: "ingredients" as never });
   const stepsArray = useFieldArray({ control, name: "steps" as never });
 
-  // Load drafts + autosave on mount
+  // Restore autosave on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setDrafts(JSON.parse(raw));
       const auto = localStorage.getItem(AUTOSAVE_KEY);
       if (auto) {
         const parsed = JSON.parse(auto);
@@ -223,30 +228,52 @@ function Adicionar() {
     reset(base);
   };
 
-  const persist = (next: SavedDraft[]) => {
-    setDrafts(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* noop */
-    }
-  };
+  const submitMutation = useMutation({
+    mutationFn: async (data: FormValues) => {
+      const isFull = data.mode === "full";
+      const tags = isFull
+        ? (data.tagsInput ?? "")
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
+      return createRecipe({
+        title: data.title.trim(),
+        category: data.category.trim(),
+        source: data.source as SourceType,
+        sourceUrl: data.sourceUrl.trim(),
+        image: isFull ? (data.image || "").trim() : "",
+        time: isFull ? (data.time || "").trim() : "",
+        difficulty: isFull ? data.difficulty : "Fácil",
+        servings: isFull ? data.servings ?? null : null,
+        tags,
+        ingredients: isFull ? (data.ingredients ?? []).map((i) => i.value).filter(Boolean) : [],
+        steps: isFull ? (data.steps ?? []).map((s) => s.value).filter(Boolean) : [],
+        notes: (data.notes ?? "").trim() || null,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["recipes"] });
+      try {
+        localStorage.removeItem(AUTOSAVE_KEY);
+      } catch {
+        /* noop */
+      }
+      setAutosavedAt(null);
+      setSaved(true);
+      setSubmitError(null);
+      setTimeout(() => setSaved(false), 2800);
+      switchMode(mode); // clean state
+    },
+    onError: (err: unknown) => {
+      setSubmitError(err instanceof Error ? err.message : "Erro ao salvar receita");
+    },
+  });
 
   const onSubmit = (data: FormValues) => {
-    const draft: SavedDraft = { id: crypto.randomUUID(), createdAt: Date.now(), data };
-    persist([draft, ...drafts]);
-    try {
-      localStorage.removeItem(AUTOSAVE_KEY);
-    } catch {
-      /* noop */
-    }
-    setAutosavedAt(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2400);
-    switchMode(mode); // reset to clean state in same mode
+    setSubmitError(null);
+    submitMutation.mutate(data);
   };
-
-  const removeDraft = (id: string) => persist(drafts.filter((d) => d.id !== id));
 
   const currentSource =
     sourceOptions.find((o) => o.value === values.source) ?? sourceOptions[0];
@@ -544,7 +571,7 @@ function Adicionar() {
               <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
                 {saved ? (
                   <span className="inline-flex items-center gap-1 text-primary font-medium">
-                    <Check size={14} aria-hidden="true" /> Rascunho salvo
+                    <Check size={14} aria-hidden="true" /> Receita enviada para validação
                   </span>
                 ) : autosavedAt ? (
                   <>
@@ -555,7 +582,7 @@ function Adicionar() {
                     })}
                   </>
                 ) : (
-                  "Salvo localmente no seu navegador"
+                  "Suas alterações ficam salvas localmente até você enviar"
                 )}
               </p>
               <div className="flex items-center gap-2">
@@ -570,13 +597,19 @@ function Adicionar() {
                 )}
                 <button
                   type="submit"
-                  disabled={formState.isSubmitting}
+                  disabled={submitMutation.isPending}
                   className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-60"
                 >
-                  <Plus size={16} aria-hidden="true" /> Salvar receita
+                  <Plus size={16} aria-hidden="true" /> {submitMutation.isPending ? "Enviando…" : "Salvar receita"}
                 </button>
               </div>
             </div>
+
+            {submitError && (
+              <p role="alert" className="text-sm text-destructive inline-flex items-center gap-1.5">
+                <AlertCircle size={14} aria-hidden="true" /> {submitError}
+              </p>
+            )}
           </form>
 
           {/* PREVIEW */}
@@ -605,53 +638,45 @@ function Adicionar() {
           </aside>
         </div>
 
-        {/* DRAFTS */}
+        {/* PENDING (recently submitted, awaiting validation) */}
         <section className="mt-14">
           <div className="flex items-baseline justify-between mb-4">
-            <h2 className="font-serif text-2xl font-bold">Rascunhos</h2>
-            <span className="text-sm text-muted-foreground">
-              {drafts.length} item{drafts.length === 1 ? "" : "s"}
-            </span>
+            <h2 className="font-serif text-2xl font-bold">Aguardando validação</h2>
+            <Link to="/validar" className="text-sm text-primary hover:underline font-medium">
+              Ir para validação →
+            </Link>
           </div>
-          {drafts.length === 0 ? (
+          {pendingRecipes.length === 0 ? (
             <p className="text-muted-foreground text-sm bg-card border border-dashed border-border rounded-2xl p-6 text-center">
-              Nenhum rascunho ainda. Cadastre a primeira receita acima.
+              Nenhuma receita pendente. Cadastre a primeira acima.
             </p>
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {drafts.map((d) => {
-                const opt = sourceOptions.find((o) => o.value === d.data.source)!;
+              {pendingRecipes.map((r) => {
+                const opt = sourceOptions.find((o) => o.value === r.source)!;
                 const Icon = opt.icon;
                 return (
                   <li
-                    key={d.id}
+                    key={r.id}
                     className="bg-card border border-border/60 rounded-2xl p-4 flex items-start gap-3"
                   >
                     <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                       <Icon size={16} aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{d.data.title}</p>
+                      <p className="font-medium text-foreground truncate">{r.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {d.data.category} • {opt.label}
-                        {d.data.mode === "full" ? " • completa" : " • rápida"}
+                        {r.category} • {opt.label}
                       </p>
                       <a
-                        href={d.data.sourceUrl}
+                        href={r.sourceUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="text-xs text-primary hover:underline break-all"
                       >
-                        {d.data.sourceUrl}
+                        {r.sourceUrl}
                       </a>
                     </div>
-                    <button
-                      onClick={() => removeDraft(d.id)}
-                      className="shrink-0 p-2 text-muted-foreground hover:text-destructive transition"
-                      aria-label={`Remover rascunho ${d.data.title}`}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                    </button>
                   </li>
                 );
               })}
