@@ -36,7 +36,7 @@ export const Route = createFileRoute("/adicionar")({
   component: Adicionar,
 });
 
-const STORAGE_KEY = "receitas-da-cris:drafts-v2";
+
 const AUTOSAVE_KEY = "receitas-da-cris:form-autosave";
 
 const sourceOptions: {
