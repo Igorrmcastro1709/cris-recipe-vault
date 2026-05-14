@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ValidarRouteImport } from './routes/validar'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdicionarRouteImport } from './routes/adicionar'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReceitaIdRouteImport } from './routes/receita.$id'
@@ -17,6 +18,11 @@ import { Route as ReceitaIdRouteImport } from './routes/receita.$id'
 const ValidarRoute = ValidarRouteImport.update({
   id: '/validar',
   path: '/validar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdicionarRoute = AdicionarRouteImport.update({
@@ -38,12 +44,14 @@ const ReceitaIdRoute = ReceitaIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/adicionar': typeof AdicionarRoute
+  '/login': typeof LoginRoute
   '/validar': typeof ValidarRoute
   '/receita/$id': typeof ReceitaIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/adicionar': typeof AdicionarRoute
+  '/login': typeof LoginRoute
   '/validar': typeof ValidarRoute
   '/receita/$id': typeof ReceitaIdRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/adicionar': typeof AdicionarRoute
+  '/login': typeof LoginRoute
   '/validar': typeof ValidarRoute
   '/receita/$id': typeof ReceitaIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/adicionar' | '/validar' | '/receita/$id'
+  fullPaths: '/' | '/adicionar' | '/login' | '/validar' | '/receita/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/adicionar' | '/validar' | '/receita/$id'
-  id: '__root__' | '/' | '/adicionar' | '/validar' | '/receita/$id'
+  to: '/' | '/adicionar' | '/login' | '/validar' | '/receita/$id'
+  id: '__root__' | '/' | '/adicionar' | '/login' | '/validar' | '/receita/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdicionarRoute: typeof AdicionarRoute
+  LoginRoute: typeof LoginRoute
   ValidarRoute: typeof ValidarRoute
   ReceitaIdRoute: typeof ReceitaIdRoute
 }
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/validar'
       fullPath: '/validar'
       preLoaderRoute: typeof ValidarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/adicionar': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdicionarRoute: AdicionarRoute,
+  LoginRoute: LoginRoute,
   ValidarRoute: ValidarRoute,
   ReceitaIdRoute: ReceitaIdRoute,
 }

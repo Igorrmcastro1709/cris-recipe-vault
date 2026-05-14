@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
+import { RequireAdmin } from "@/components/RequireAdmin";
 import { createRecipe, fetchRecipes, type Recipe, type SourceType } from "@/lib/recipes";
 
 export const Route = createFileRoute("/adicionar")({
@@ -33,7 +34,11 @@ export const Route = createFileRoute("/adicionar")({
       },
     ],
   }),
-  component: Adicionar,
+  component: () => (
+    <RequireAdmin>
+      <Adicionar />
+    </RequireAdmin>
+  ),
 });
 
 

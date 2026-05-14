@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, AlertCircle, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { Header } from "@/components/Header";
+import { RequireAdmin } from "@/components/RequireAdmin";
 import { fetchRecipes, setRecipeValidated, deleteRecipe } from "@/lib/recipes";
 
 export const Route = createFileRoute("/validar")({
@@ -11,7 +12,11 @@ export const Route = createFileRoute("/validar")({
       { name: "description", content: "Pré-visualize e valide receitas antes de publicá-las no catálogo." },
     ],
   }),
-  component: Validar,
+  component: () => (
+    <RequireAdmin>
+      <Validar />
+    </RequireAdmin>
+  ),
 });
 
 function Validar() {
