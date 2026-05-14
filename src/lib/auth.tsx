@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
             await ensureProfile(newSession.user);
             // First user becomes admin (no-op if already exists)
-            await supabase.rpc("claim_admin_if_first").catch(() => {});
+            try { await supabase.rpc("claim_admin_if_first"); } catch { /* ignore */ }
           }
           const admin = await fetchIsAdmin(newSession.user.id);
           setIsAdmin(admin);
