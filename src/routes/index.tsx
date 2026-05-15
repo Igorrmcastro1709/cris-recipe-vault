@@ -122,6 +122,21 @@ function Index() {
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl">
             Centralize posts do Instagram, PDFs, vídeos e links em um catálogo pesquisável, com ingredientes, fontes e passo a passo.
           </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              to={user ? "/adicionar" : "/login"}
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition"
+            >
+              Começar agora <span aria-hidden="true">→</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" })}
+              className="inline-flex items-center gap-2 border border-input bg-background px-5 py-2.5 rounded-xl text-sm font-semibold text-foreground hover:bg-accent hover:text-accent-foreground transition"
+            >
+              Ver catálogo
+            </button>
+          </div>
         </div>
       </section>
 
@@ -167,7 +182,7 @@ function Index() {
         </div>
       </search>
 
-      <section className="max-w-6xl mx-auto px-6 py-10 sm:py-12">
+      <section id="catalogo" className="max-w-6xl mx-auto px-6 py-10 sm:py-12">
         <div className="flex items-baseline justify-between gap-3 mb-6 flex-wrap">
           <h2 className="font-serif text-2xl font-bold text-foreground">Catálogo</h2>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
