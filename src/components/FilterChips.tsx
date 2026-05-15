@@ -11,6 +11,7 @@ interface FilterChipsProps {
   options: ChipOption[];
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }
 
 export function FilterChips({ label, options, value, onChange }: FilterChipsProps) {
