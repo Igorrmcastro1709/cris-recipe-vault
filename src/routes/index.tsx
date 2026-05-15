@@ -194,6 +194,20 @@ function Index() {
             <p className="text-destructive font-medium">Não consegui carregar o catálogo.</p>
             <p className="text-sm text-muted-foreground mt-1">Tente recarregar a página em alguns instantes.</p>
           </div>
+        ) : recipes.length === 0 ? (
+          <div className="text-center py-16 sm:py-20 border border-dashed border-border rounded-2xl bg-card/50">
+            <div className="text-5xl mb-4" aria-hidden="true">🍳</div>
+            <p className="font-serif text-xl font-bold text-foreground">Nenhuma receita ainda</p>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+              Adicione sua primeira receita para começar seu livro online.
+            </p>
+            <Link
+              to={user ? "/adicionar" : "/login"}
+              className="mt-5 inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition"
+            >
+              Adicionar receita
+            </Link>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 sm:py-20 border border-dashed border-border rounded-2xl bg-card/50">
             <p className="font-serif text-xl font-bold text-foreground">Nada encontrado por aqui.</p>
