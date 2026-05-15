@@ -35,6 +35,7 @@ function Index() {
   const [src, setSrc] = useState<SourceType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const userMeta = useAllUserMeta();
+  const { user } = useAuth();
 
   const { data: recipes = [], isLoading, error } = useQuery({
     queryKey: ["recipes", "validated"],
