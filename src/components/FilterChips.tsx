@@ -14,12 +14,13 @@ interface FilterChipsProps {
   disabled?: boolean;
 }
 
-export function FilterChips({ label, options, value, onChange }: FilterChipsProps) {
+export function FilterChips({ label, options, value, onChange, disabled }: FilterChipsProps) {
   return (
-    <div role="radiogroup" aria-label={label} className="-mx-1 px-1 overflow-x-auto scrollbar-thin">
+    <div role="radiogroup" aria-label={label} className={cn("-mx-1 px-1 overflow-x-auto scrollbar-thin", disabled && "opacity-50 pointer-events-none")}>
       <div className="flex gap-2 min-w-max py-1">
         {options.map((opt) => {
           const active = value === opt.value;
+          const labelText = typeof opt.count === "number" ? `${opt.label} (${opt.count})` : opt.label;
           return (
             <button
               key={opt.value}
@@ -35,17 +36,7 @@ export function FilterChips({ label, options, value, onChange }: FilterChipsProp
                   : "bg-background text-foreground/75 border-border hover:border-primary/50 hover:text-foreground",
               )}
             >
-              <span>{opt.label}</span>
-              {typeof opt.count === "number" && (
-                <span
-                  className={cn(
-                    "text-[10px] tabular-nums px-1.5 py-0.5 rounded-full",
-                    active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {opt.count}
-                </span>
-              )}
+              <span>{labelText}</span>
             </button>
           );
         })}
