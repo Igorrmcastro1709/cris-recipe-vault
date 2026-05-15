@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, X, Loader2 } from "lucide-react";
@@ -7,6 +7,7 @@ import { RecipeCard } from "@/components/RecipeCard";
 import { FilterChips, type ChipOption } from "@/components/FilterChips";
 import { fetchRecipes, type SourceType } from "@/lib/recipes";
 import { useAllUserMeta } from "@/lib/user-meta";
+import { useAuth } from "@/lib/auth";
 
 type StatusFilter = "all" | "favorita" | "quero-testar" | "ja-fiz" | "avaliadas";
 
