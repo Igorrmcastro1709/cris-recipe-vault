@@ -182,7 +182,7 @@ function Index() {
         </div>
       </search>
 
-      <section className="max-w-6xl mx-auto px-6 py-10 sm:py-12">
+      <section id="catalogo" className="max-w-6xl mx-auto px-6 py-10 sm:py-12">
         <div className="flex items-baseline justify-between gap-3 mb-6 flex-wrap">
           <h2 className="font-serif text-2xl font-bold text-foreground">Catálogo</h2>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
