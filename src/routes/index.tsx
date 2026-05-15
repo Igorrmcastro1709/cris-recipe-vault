@@ -152,12 +152,12 @@ function Index() {
 
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Categoria</p>
-            <FilterChips label="Filtrar por categoria" options={categoryOptions} value={cat} onChange={setCat} />
+            <FilterChips label="Filtrar por categoria" options={categoryOptions} value={cat} onChange={setCat} disabled={recipes.length === 0} />
           </div>
 
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Fonte</p>
-            <FilterChips label="Filtrar por fonte" options={sourceOptions} value={src} onChange={(v) => setSrc(v as SourceType | "all")} />
+            <FilterChips label="Filtrar por fonte" options={sourceOptions} value={src} onChange={(v) => setSrc(v as SourceType | "all")} disabled={recipes.length === 0} />
           </div>
 
           <div className="space-y-2">
