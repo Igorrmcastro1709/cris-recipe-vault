@@ -114,8 +114,24 @@ function Index() {
 
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-accent/40 via-background to-background pointer-events-none" />
+        {/* Decorative dot grid */}
+        <svg className="absolute right-0 top-0 h-full w-1/2 text-primary opacity-[0.055] pointer-events-none" aria-hidden="true">
+          <defs>
+            <pattern id="hero-dots" x="0" y="0" width="22" height="22" patternUnits="userSpaceOnUse">
+              <circle cx="2.5" cy="2.5" r="1.8" fill="currentColor" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#hero-dots)" />
+        </svg>
         <div className="relative max-w-6xl mx-auto px-6 pt-12 sm:pt-16 pb-16 sm:pb-20">
-          <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold mb-4">Livro online vivo</p>
+          <div className="flex items-center gap-3 mb-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">Livro online vivo</p>
+            {recipes.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
+                {recipes.length} receita{recipes.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
           <h1 className="font-serif font-bold text-foreground leading-[1.05] tracking-tight max-w-3xl text-[clamp(2.25rem,6vw,4.5rem)]">
             Receitas salvas, organizadas e prontas para cozinhar.
           </h1>
@@ -125,7 +141,7 @@ function Index() {
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               to={user ? "/adicionar" : "/login"}
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition"
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition shadow-sm shadow-primary/20"
             >
               Começar agora <span aria-hidden="true">→</span>
             </Link>

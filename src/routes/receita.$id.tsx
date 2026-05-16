@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   Loader2,
+  Printer,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { StarRating } from "@/components/StarRating";
@@ -79,10 +80,17 @@ function Detail({ recipe }: { recipe: Recipe }) {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <div className="max-w-5xl mx-auto px-6 pt-6">
+      <div className="max-w-5xl mx-auto px-6 pt-6 flex items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition">
           <ArrowLeft size={14} aria-hidden="true" /> Catálogo
         </Link>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition print:hidden"
+        >
+          <Printer size={14} aria-hidden="true" /> Imprimir
+        </button>
       </div>
 
       <article className="max-w-5xl mx-auto px-6 py-8">
@@ -154,10 +162,10 @@ function Detail({ recipe }: { recipe: Recipe }) {
                         type="checkbox"
                         checked={!!checked[i]}
                         onChange={(e) => setChecked((prev) => ({ ...prev, [i]: e.target.checked }))}
-                        className="mt-0.5 w-4 h-4 rounded border-border accent-primary cursor-pointer"
+                        className="mt-0.5 w-5 h-5 shrink-0 rounded-md border-border accent-primary cursor-pointer"
                         aria-label={`Marcar ${ing}`}
                       />
-                      <span className={checked[i] ? "line-through text-muted-foreground" : "text-foreground"}>{ing}</span>
+                      <span className={`transition-colors duration-200 leading-relaxed ${checked[i] ? "line-through text-muted-foreground" : "text-foreground"}`}>{ing}</span>
                     </label>
                   </li>
                 ))}
@@ -173,10 +181,10 @@ function Detail({ recipe }: { recipe: Recipe }) {
               <ol className="space-y-4">
                 {recipe.steps.map((step, i) => (
                   <li key={i} className="flex gap-4">
-                    <span className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary font-serif font-bold flex items-center justify-center text-sm">
+                    <span className="shrink-0 w-10 h-10 rounded-full bg-primary/12 text-primary border border-primary/20 font-serif font-bold flex items-center justify-center text-base leading-none">
                       {i + 1}
                     </span>
-                    <p className="text-foreground pt-1 leading-relaxed">{step}</p>
+                    <p className="text-foreground pt-2 leading-relaxed">{step}</p>
                   </li>
                 ))}
               </ol>
