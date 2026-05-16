@@ -17,6 +17,8 @@ import {
   Eye,
   Save,
   AlertCircle,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
@@ -43,6 +45,7 @@ export const Route = createFileRoute("/adicionar")({
 
 
 const AUTOSAVE_KEY = "receitas-da-cris:form-autosave";
+const AI_KEY_STORAGE = "cris_claude_key";
 
 const sourceOptions: {
   value: SourceType;
@@ -280,6 +283,25 @@ function Adicionar() {
     submitMutation.mutate(data);
   };
 
+  const handleAiExtracted = (data: Partial<FormValues>) => {
+    setMode("full");
+    reset({
+      mode: "full",
+      title: data.title ?? "",
+      category: data.category ?? "",
+      source: (data.source as SourceType) ?? "link",
+      sourceUrl: data.sourceUrl ?? "",
+      image: data.image ?? "",
+      time: data.time ?? "",
+      difficulty: data.difficulty ?? "Fácil",
+      servings: data.servings,
+      tagsInput: data.tagsInput ?? "",
+      ingredients: data.ingredients?.length ? data.ingredients : [{ value: "" }],
+      steps: data.steps?.length ? data.steps : [{ value: "" }],
+      notes: data.notes ?? "",
+    });
+  };
+
   const currentSource =
     sourceOptions.find((o) => o.value === values.source) ?? sourceOptions[0];
 
@@ -352,6 +374,8 @@ function Adicionar() {
             </button>
           ))}
         </div>
+
+        <AiExtract onExtracted={handleAiExtracted} />
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,360px)] gap-8">
           {/* FORM */}
@@ -689,6 +713,221 @@ function Adicionar() {
           )}
         </section>
       </div>
+    </div>
+  );
+}
+
+/* ---------- AI extraction ---------- */
+
+function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) => void }) {
+  const [apiKey, setApiKey] = useState(() => {
+    try { return localStorage.getItem(AI_KEY_STORAGE) ?? ""; } catch { return ""; }
+  });
+  const [showKey, setShowKey] = useState(false);
+  const [url, setUrl] = useState("");
+  const [rawText, setRawText] = useState("");
+  const [status, setStatus] = useState<{ type: "idle" | "loading" | "success" | "error"; msg: string }>({ type: "idle", msg: "" });
+  const [open, setOpen] = useState(false);
+
+  const saveKey = () => {
+    try { localStorage.setItem(AI_KEY_STORAGE, apiKey); } catch { /* noop */ }
+  };
+
+  const extract = async () => {
+    if (!apiKey.trim()) {
+      setStatus({ type: "error", msg: "Configure sua chave Claude API primeiro." });
+      setOpen(true);
+      return;
+    }
+    if (!url.trim() && !rawText.trim()) {
+      setStatus({ type: "error", msg: "Cole uma URL ou o texto da receita." });
+      return;
+    }
+
+    saveKey();
+    let content = rawText.trim();
+
+    if (url.trim()) {
+      setStatus({ type: "loading", msg: "Buscando conteúdo da URL…" });
+      try {
+        const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(url.trim())}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        content = (doc.body.innerText ?? "").slice(0, 8000);
+      } catch {
+        setStatus({ type: "error", msg: "Não consegui carregar a URL. Cole o texto da receita no campo abaixo." });
+        return;
+      }
+    }
+
+    setStatus({ type: "loading", msg: "Extraindo receita com IA…" });
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": apiKey.trim(),
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2048,
+          system: `You are a recipe extraction assistant. Extract recipe information from the provided text and return ONLY a valid JSON object with this exact schema (no markdown, no explanation, no code fences):
+{"title":"string","category":"string (e.g. Doces, Pães, Saladas, Massas, Sopas, Carnes, Frango, Vegetariano)","time":"string (e.g. 30min, 1h 20min)","difficulty":"Fácil" or "Médio" or "Difícil","servings":number or null,"tagsInput":"comma-separated tags","ingredients":["string",...],"steps":["string",...],"notes":"string or null"}`,
+          messages: [{ role: "user", content: `Extract recipe data from this text:\n\n${content}` }],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+        throw new Error(err.error?.message ?? `HTTP ${res.status}`);
+      }
+
+      const json = await res.json() as { content?: { text?: string }[] };
+      const text = (json.content?.[0]?.text ?? "").trim();
+      const parsed = JSON.parse(text) as {
+        title?: string; category?: string; time?: string;
+        difficulty?: string; servings?: number | null; tagsInput?: string;
+        ingredients?: string[]; steps?: string[]; notes?: string | null;
+      };
+
+      const validDiff = ["Fácil", "Médio", "Difícil"];
+      const extracted: Partial<FormValues> = {
+        title: parsed.title ?? "",
+        category: parsed.category ?? "",
+        source: "link",
+        sourceUrl: url.trim() || "",
+        time: parsed.time ?? "",
+        difficulty: validDiff.includes(parsed.difficulty ?? "") ? (parsed.difficulty as FormValues["difficulty"]) : "Fácil",
+        servings: parsed.servings ?? undefined,
+        tagsInput: parsed.tagsInput ?? "",
+        ingredients: Array.isArray(parsed.ingredients) && parsed.ingredients.length
+          ? parsed.ingredients.map((v) => ({ value: String(v) }))
+          : [{ value: "" }],
+        steps: Array.isArray(parsed.steps) && parsed.steps.length
+          ? parsed.steps.map((v) => ({ value: String(v) }))
+          : [{ value: "" }],
+        notes: parsed.notes ?? "",
+      };
+
+      onExtracted(extracted);
+      setStatus({ type: "success", msg: `"${parsed.title ?? "Receita"}" extraída com sucesso! Revise os campos e salve.` });
+    } catch (e) {
+      setStatus({ type: "error", msg: e instanceof Error ? e.message : "Erro ao processar a resposta da IA." });
+    }
+  };
+
+  return (
+    <div className="mt-6 bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center gap-2.5 px-6 py-4 text-left hover:bg-muted/40 transition"
+      >
+        <Sparkles size={16} className="text-primary shrink-0" aria-hidden="true" />
+        <span className="text-sm font-semibold text-foreground">Extrair receita com IA</span>
+        <span className="ml-1 text-xs text-muted-foreground bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Beta</span>
+        <span className="ml-auto text-xs text-muted-foreground">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="px-6 pb-6 space-y-4 border-t border-border/60 pt-5">
+          {/* API Key */}
+          <div>
+            <label htmlFor="ai-key" className="block text-sm font-medium text-foreground mb-2">
+              Chave Claude API <span className="text-primary">*</span>
+            </label>
+            <div className="relative">
+              <input
+                id="ai-key"
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                onBlur={saveKey}
+                placeholder="sk-ant-api03-..."
+                className={`${inputClass(false)} pr-10`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((p) => !p)}
+                aria-label={showKey ? "Ocultar chave" : "Mostrar chave"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition"
+              >
+                <Eye size={14} aria-hidden="true" />
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Chave salva apenas no seu navegador — nunca enviada para nossos servidores.
+            </p>
+          </div>
+
+          {/* URL */}
+          <div>
+            <label htmlFor="ai-url" className="block text-sm font-medium text-foreground mb-2">
+              URL da receita
+            </label>
+            <input
+              id="ai-url"
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://blogdereceitas.com/bolo-de-fuba"
+              className={inputClass(false)}
+            />
+          </div>
+
+          {/* Raw text fallback */}
+          <div>
+            <label htmlFor="ai-text" className="block text-sm font-medium text-foreground mb-2">
+              Ou cole o texto da receita
+            </label>
+            <textarea
+              id="ai-text"
+              rows={4}
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
+              placeholder="Cole aqui o texto completo da receita com ingredientes e modo de preparo…"
+              className={`${inputClass(false)} resize-none`}
+            />
+          </div>
+
+          {status.type !== "idle" && (
+            <p
+              role="status"
+              className={`text-sm inline-flex items-center gap-1.5 ${
+                status.type === "error"
+                  ? "text-destructive"
+                  : status.type === "success"
+                  ? "text-primary"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {status.type === "loading" && (
+                <Loader2 size={14} className="animate-spin shrink-0" aria-hidden="true" />
+              )}
+              {status.msg}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={extract}
+            disabled={status.type === "loading"}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {status.type === "loading" ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Sparkles size={16} aria-hidden="true" />
+            )}
+            {status.type === "loading" ? "Extraindo…" : "Extrair receita"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
