@@ -49,8 +49,13 @@ export async function fetchRecipes(opts?: { onlyValidated?: boolean }): Promise<
   return (data ?? []).map(mapRow);
 }
 
-export async function fetchRecipeById(id: string): Promise<Recipe | null> {
-  const { data, error } = await supabase.from("recipes").select("*").eq("id", id).maybeSingle();
+export async function fetchRecipeById(
+  id: string,
+  opts?: { includeDrafts?: boolean },
+): Promise<Recipe | null> {
+  let q = supabase.from("recipes").select("*").eq("id", id);
+  if (!opts?.includeDrafts) q = q.eq("validated", true);
+  const { data, error } = await q.maybeSingle();
   if (error) throw error;
   return data ? mapRow(data) : null;
 }

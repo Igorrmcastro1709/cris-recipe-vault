@@ -43,7 +43,6 @@ export const Route = createFileRoute("/adicionar")({
   ),
 });
 
-
 const AUTOSAVE_KEY = "receitas-da-cris:form-autosave";
 const AI_KEY_STORAGE = "cris_claude_key";
 
@@ -114,9 +113,7 @@ const schema = z
     ingredients: z
       .array(z.object({ value: z.string().trim().min(1, "Ingrediente vazio") }))
       .default([]),
-    steps: z
-      .array(z.object({ value: z.string().trim().min(1, "Passo vazio") }))
-      .default([]),
+    steps: z.array(z.object({ value: z.string().trim().min(1, "Passo vazio") })).default([]),
     notes: z.string().max(1000).optional().default(""),
   })
   .superRefine((data, ctx) => {
@@ -135,9 +132,7 @@ const schema = z
 
 type FormValues = z.input<typeof schema>;
 
-const PLACEHOLDER_IMG =
-  "https://images.unsplash.com/photo-1495546200529-39e0e3825bdc?w=800";
-
+const PLACEHOLDER_IMG = "https://images.unsplash.com/photo-1495546200529-39e0e3825bdc?w=800";
 
 function Adicionar() {
   const qc = useQueryClient();
@@ -152,7 +147,10 @@ function Adicionar() {
   });
 
   const existingCategories = useMemo(
-    () => Array.from(new Set(allRecipes.map((r) => r.category))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    () =>
+      Array.from(new Set(allRecipes.map((r) => r.category))).sort((a, b) =>
+        a.localeCompare(b, "pt-BR"),
+      ),
     [allRecipes],
   );
 
@@ -253,7 +251,7 @@ function Adicionar() {
         image: isFull ? (data.image || "").trim() : "",
         time: isFull ? (data.time || "").trim() : "",
         difficulty: isFull ? data.difficulty : "Fácil",
-        servings: isFull ? data.servings ?? null : null,
+        servings: isFull ? (data.servings ?? null) : null,
         tags,
         ingredients: isFull ? (data.ingredients ?? []).map((i) => i.value).filter(Boolean) : [],
         steps: isFull ? (data.steps ?? []).map((s) => s.value).filter(Boolean) : [],
@@ -302,8 +300,7 @@ function Adicionar() {
     });
   };
 
-  const currentSource =
-    sourceOptions.find((o) => o.value === values.source) ?? sourceOptions[0];
+  const currentSource = sourceOptions.find((o) => o.value === values.source) ?? sourceOptions[0];
 
   // Build a preview Recipe from current values
   const previewRecipe: Recipe = useMemo(() => {
@@ -324,9 +321,7 @@ function Adicionar() {
       time: isFull ? values.time || "—" : "—",
       difficulty: isFull ? values.difficulty || "Fácil" : "—",
       tags,
-      ingredients: isFull
-        ? (values.ingredients ?? []).map((i) => i.value).filter(Boolean)
-        : [],
+      ingredients: isFull ? (values.ingredients ?? []).map((i) => i.value).filter(Boolean) : [],
       steps: isFull ? (values.steps ?? []).map((s) => s.value).filter(Boolean) : [],
       validated: false,
     };
@@ -441,12 +436,7 @@ function Adicionar() {
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field
-                label="Título"
-                id="title"
-                required
-                error={formState.errors.title?.message}
-              >
+              <Field label="Título" id="title" required error={formState.errors.title?.message}>
                 <input
                   id="title"
                   type="text"
@@ -496,12 +486,7 @@ function Adicionar() {
                 </Field>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <Field
-                    label="Tempo"
-                    id="time"
-                    required
-                    error={formState.errors.time?.message}
-                  >
+                  <Field label="Tempo" id="time" required error={formState.errors.time?.message}>
                     <input
                       id="time"
                       type="text"
@@ -554,7 +539,9 @@ function Adicionar() {
                   itemLabelPrefix="Ingrediente"
                   placeholder="Ex.: 2 xíc. de farinha"
                   items={ingredientsArray.fields}
-                  errors={formState.errors.ingredients as { value?: { message?: string } }[] | undefined}
+                  errors={
+                    formState.errors.ingredients as { value?: { message?: string } }[] | undefined
+                  }
                   rootError={
                     typeof formState.errors.ingredients?.message === "string"
                       ? formState.errors.ingredients.message
@@ -629,7 +616,8 @@ function Adicionar() {
                   disabled={submitMutation.isPending}
                   className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-60"
                 >
-                  <Plus size={16} aria-hidden="true" /> {submitMutation.isPending ? "Enviando…" : "Salvar receita"}
+                  <Plus size={16} aria-hidden="true" />{" "}
+                  {submitMutation.isPending ? "Enviando…" : "Salvar receita"}
                 </button>
               </div>
             </div>
@@ -721,16 +709,27 @@ function Adicionar() {
 
 function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) => void }) {
   const [apiKey, setApiKey] = useState(() => {
-    try { return localStorage.getItem(AI_KEY_STORAGE) ?? ""; } catch { return ""; }
+    try {
+      return localStorage.getItem(AI_KEY_STORAGE) ?? "";
+    } catch {
+      return "";
+    }
   });
   const [showKey, setShowKey] = useState(false);
   const [url, setUrl] = useState("");
   const [rawText, setRawText] = useState("");
-  const [status, setStatus] = useState<{ type: "idle" | "loading" | "success" | "error"; msg: string }>({ type: "idle", msg: "" });
+  const [status, setStatus] = useState<{
+    type: "idle" | "loading" | "success" | "error";
+    msg: string;
+  }>({ type: "idle", msg: "" });
   const [open, setOpen] = useState(false);
 
   const saveKey = () => {
-    try { localStorage.setItem(AI_KEY_STORAGE, apiKey); } catch { /* noop */ }
+    try {
+      localStorage.setItem(AI_KEY_STORAGE, apiKey);
+    } catch {
+      /* noop */
+    }
   };
 
   const extract = async () => {
@@ -757,7 +756,10 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
         const doc = new DOMParser().parseFromString(html, "text/html");
         content = (doc.body.innerText ?? "").slice(0, 8000);
       } catch {
-        setStatus({ type: "error", msg: "Não consegui carregar a URL. Cole o texto da receita no campo abaixo." });
+        setStatus({
+          type: "error",
+          msg: "Não consegui carregar a URL. Cole o texto da receita no campo abaixo.",
+        });
         return;
       }
     }
@@ -778,21 +780,29 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
           max_tokens: 2048,
           system: `You are a recipe extraction assistant. Extract recipe information from the provided text and return ONLY a valid JSON object with this exact schema (no markdown, no explanation, no code fences):
 {"title":"string","category":"string (e.g. Doces, Pães, Saladas, Massas, Sopas, Carnes, Frango, Vegetariano)","time":"string (e.g. 30min, 1h 20min)","difficulty":"Fácil" or "Médio" or "Difícil","servings":number or null,"tagsInput":"comma-separated tags","ingredients":["string",...],"steps":["string",...],"notes":"string or null"}`,
-          messages: [{ role: "user", content: `Extract recipe data from this text:\n\n${content}` }],
+          messages: [
+            { role: "user", content: `Extract recipe data from this text:\n\n${content}` },
+          ],
         }),
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+        const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
         throw new Error(err.error?.message ?? `HTTP ${res.status}`);
       }
 
-      const json = await res.json() as { content?: { text?: string }[] };
+      const json = (await res.json()) as { content?: { text?: string }[] };
       const text = (json.content?.[0]?.text ?? "").trim();
       const parsed = JSON.parse(text) as {
-        title?: string; category?: string; time?: string;
-        difficulty?: string; servings?: number | null; tagsInput?: string;
-        ingredients?: string[]; steps?: string[]; notes?: string | null;
+        title?: string;
+        category?: string;
+        time?: string;
+        difficulty?: string;
+        servings?: number | null;
+        tagsInput?: string;
+        ingredients?: string[];
+        steps?: string[];
+        notes?: string | null;
       };
 
       const validDiff = ["Fácil", "Médio", "Difícil"];
@@ -802,22 +812,32 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
         source: "link",
         sourceUrl: url.trim() || "",
         time: parsed.time ?? "",
-        difficulty: validDiff.includes(parsed.difficulty ?? "") ? (parsed.difficulty as FormValues["difficulty"]) : "Fácil",
+        difficulty: validDiff.includes(parsed.difficulty ?? "")
+          ? (parsed.difficulty as FormValues["difficulty"])
+          : "Fácil",
         servings: parsed.servings ?? undefined,
         tagsInput: parsed.tagsInput ?? "",
-        ingredients: Array.isArray(parsed.ingredients) && parsed.ingredients.length
-          ? parsed.ingredients.map((v) => ({ value: String(v) }))
-          : [{ value: "" }],
-        steps: Array.isArray(parsed.steps) && parsed.steps.length
-          ? parsed.steps.map((v) => ({ value: String(v) }))
-          : [{ value: "" }],
+        ingredients:
+          Array.isArray(parsed.ingredients) && parsed.ingredients.length
+            ? parsed.ingredients.map((v) => ({ value: String(v) }))
+            : [{ value: "" }],
+        steps:
+          Array.isArray(parsed.steps) && parsed.steps.length
+            ? parsed.steps.map((v) => ({ value: String(v) }))
+            : [{ value: "" }],
         notes: parsed.notes ?? "",
       };
 
       onExtracted(extracted);
-      setStatus({ type: "success", msg: `"${parsed.title ?? "Receita"}" extraída com sucesso! Revise os campos e salve.` });
+      setStatus({
+        type: "success",
+        msg: `"${parsed.title ?? "Receita"}" extraída com sucesso! Revise os campos e salve.`,
+      });
     } catch (e) {
-      setStatus({ type: "error", msg: e instanceof Error ? e.message : "Erro ao processar a resposta da IA." });
+      setStatus({
+        type: "error",
+        msg: e instanceof Error ? e.message : "Erro ao processar a resposta da IA.",
+      });
     }
   };
 
@@ -830,7 +850,9 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
       >
         <Sparkles size={16} className="text-primary shrink-0" aria-hidden="true" />
         <span className="text-sm font-semibold text-foreground">Extrair receita com IA</span>
-        <span className="ml-1 text-xs text-muted-foreground bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Beta</span>
+        <span className="ml-1 text-xs text-muted-foreground bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+          Beta
+        </span>
         <span className="ml-auto text-xs text-muted-foreground">{open ? "▲" : "▼"}</span>
       </button>
 
@@ -902,8 +924,8 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
                 status.type === "error"
                   ? "text-destructive"
                   : status.type === "success"
-                  ? "text-primary"
-                  : "text-muted-foreground"
+                    ? "text-primary"
+                    : "text-muted-foreground"
               }`}
             >
               {status.type === "loading" && (
@@ -962,10 +984,7 @@ function Field({
       </label>
       {children}
       {error ? (
-        <p
-          role="alert"
-          className="mt-1.5 text-xs text-destructive inline-flex items-center gap-1"
-        >
+        <p role="alert" className="mt-1.5 text-xs text-destructive inline-flex items-center gap-1">
           <AlertCircle size={12} aria-hidden="true" /> {error}
         </p>
       ) : hint ? (

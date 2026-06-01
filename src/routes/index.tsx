@@ -15,7 +15,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Receitas da Cris — Catálogo de receitas" },
-      { name: "description", content: "Catálogo online das receitas da Cris: salvas a partir de Instagram, PDFs, vídeos, imagens e links." },
+      {
+        name: "description",
+        content:
+          "Catálogo online das receitas da Cris: salvas a partir de Instagram, PDFs, vídeos, imagens e links.",
+      },
     ],
   }),
   component: Index,
@@ -37,7 +41,11 @@ function Index() {
   const userMeta = useAllUserMeta();
   const { user } = useAuth();
 
-  const { data: recipes = [], isLoading, error } = useQuery({
+  const {
+    data: recipes = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["recipes", "validated"],
     queryFn: () => fetchRecipes({ onlyValidated: true }),
   });
@@ -69,10 +77,22 @@ function Index() {
       recipes.filter((r) => predicate(r.id)).length;
     return [
       { value: "all", label: "Todas" },
-      { value: "favorita", label: "Favoritas", count: count((id) => userMeta[id]?.status === "favorita") },
-      { value: "quero-testar", label: "Quero testar", count: count((id) => userMeta[id]?.status === "quero-testar") },
+      {
+        value: "favorita",
+        label: "Favoritas",
+        count: count((id) => userMeta[id]?.status === "favorita"),
+      },
+      {
+        value: "quero-testar",
+        label: "Quero testar",
+        count: count((id) => userMeta[id]?.status === "quero-testar"),
+      },
       { value: "ja-fiz", label: "Já fiz", count: count((id) => userMeta[id]?.status === "ja-fiz") },
-      { value: "avaliadas", label: "Avaliadas", count: count((id) => (userMeta[id]?.rating ?? 0) > 0) },
+      {
+        value: "avaliadas",
+        label: "Avaliadas",
+        count: count((id) => (userMeta[id]?.rating ?? 0) > 0),
+      },
     ];
   }, [userMeta, recipes]);
 
@@ -90,17 +110,23 @@ function Index() {
       if (!query) return true;
       return (
         r.title.toLowerCase().includes(query) ||
+        r.category.toLowerCase().includes(query) ||
         r.tags.some((t) => t.toLowerCase().includes(query)) ||
-        r.ingredients.some((i) => i.toLowerCase().includes(query))
+        r.ingredients.some((i) => i.toLowerCase().includes(query)) ||
+        r.steps.some((s) => s.toLowerCase().includes(query)) ||
+        (r.notes?.toLowerCase().includes(query) ?? false)
       );
     });
     if (statusFilter === "avaliadas") {
-      return [...list].sort((a, b) => (userMeta[b.id]?.rating ?? 0) - (userMeta[a.id]?.rating ?? 0));
+      return [...list].sort(
+        (a, b) => (userMeta[b.id]?.rating ?? 0) - (userMeta[a.id]?.rating ?? 0),
+      );
     }
     return list;
   }, [q, cat, src, statusFilter, userMeta, recipes]);
 
-  const hasActiveFilter = q.trim() !== "" || cat !== "all" || src !== "all" || statusFilter !== "all";
+  const hasActiveFilter =
+    q.trim() !== "" || cat !== "all" || src !== "all" || statusFilter !== "all";
   const clearFilters = () => {
     setQ("");
     setCat("all");
@@ -115,9 +141,19 @@ function Index() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-accent/40 via-background to-background pointer-events-none" />
         {/* Decorative dot grid */}
-        <svg className="absolute right-0 top-0 h-full w-1/2 text-primary opacity-[0.055] pointer-events-none" aria-hidden="true">
+        <svg
+          className="absolute right-0 top-0 h-full w-1/2 text-primary opacity-[0.055] pointer-events-none"
+          aria-hidden="true"
+        >
           <defs>
-            <pattern id="hero-dots" x="0" y="0" width="22" height="22" patternUnits="userSpaceOnUse">
+            <pattern
+              id="hero-dots"
+              x="0"
+              y="0"
+              width="22"
+              height="22"
+              patternUnits="userSpaceOnUse"
+            >
               <circle cx="2.5" cy="2.5" r="1.8" fill="currentColor" />
             </pattern>
           </defs>
@@ -125,7 +161,9 @@ function Index() {
         </svg>
         <div className="relative max-w-6xl mx-auto px-6 pt-12 sm:pt-16 pb-16 sm:pb-20">
           <div className="flex items-center gap-3 mb-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">Livro online vivo</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">
+              Livro online vivo
+            </p>
             {recipes.length > 0 && (
               <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
                 {recipes.length} receita{recipes.length === 1 ? "" : "s"}
@@ -136,7 +174,8 @@ function Index() {
             Receitas salvas, organizadas e prontas para cozinhar.
           </h1>
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl">
-            Centralize posts do Instagram, PDFs, vídeos e links em um catálogo pesquisável, com ingredientes, fontes e passo a passo.
+            Centralize posts do Instagram, PDFs, vídeos e links em um catálogo pesquisável, com
+            ingredientes, fontes e passo a passo.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
@@ -147,7 +186,9 @@ function Index() {
             </Link>
             <button
               type="button"
-              onClick={() => document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" })}
+              onClick={() =>
+                document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" })
+              }
               className="inline-flex items-center gap-2 border border-input bg-background px-5 py-2.5 rounded-xl text-sm font-semibold text-foreground hover:bg-accent hover:text-accent-foreground transition"
             >
               Ver catálogo
@@ -156,11 +197,20 @@ function Index() {
         </div>
       </section>
 
-      <search aria-label="Buscar e filtrar receitas" className="block max-w-6xl mx-auto px-6 -mt-8 relative">
+      <search
+        aria-label="Buscar e filtrar receitas"
+        className="block max-w-6xl mx-auto px-6 -mt-8 relative"
+      >
         <div className="bg-card border border-border/60 rounded-2xl p-4 md:p-5 shadow-sm space-y-4">
           <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <label htmlFor="recipe-search" className="sr-only">Buscar receitas</label>
+            <Search
+              size={18}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <label htmlFor="recipe-search" className="sr-only">
+              Buscar receitas
+            </label>
             <input
               id="recipe-search"
               type="search"
@@ -182,18 +232,41 @@ function Index() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Categoria</p>
-            <FilterChips label="Filtrar por categoria" options={categoryOptions} value={cat} onChange={setCat} disabled={recipes.length === 0} />
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Categoria
+            </p>
+            <FilterChips
+              label="Filtrar por categoria"
+              options={categoryOptions}
+              value={cat}
+              onChange={setCat}
+              disabled={recipes.length === 0}
+            />
           </div>
 
           <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Fonte</p>
-            <FilterChips label="Filtrar por fonte" options={sourceOptions} value={src} onChange={(v) => setSrc(v as SourceType | "all")} disabled={recipes.length === 0} />
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Fonte
+            </p>
+            <FilterChips
+              label="Filtrar por fonte"
+              options={sourceOptions}
+              value={src}
+              onChange={(v) => setSrc(v as SourceType | "all")}
+              disabled={recipes.length === 0}
+            />
           </div>
 
           <div className="space-y-2">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Minhas marcações</p>
-            <FilterChips label="Filtrar pelas minhas marcações" options={statusOptions} value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)} />
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Minhas marcações
+            </p>
+            <FilterChips
+              label="Filtrar pelas minhas marcações"
+              options={statusOptions}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as StatusFilter)}
+            />
           </div>
         </div>
       </search>
@@ -223,11 +296,15 @@ function Index() {
         ) : error ? (
           <div className="text-center py-16 border border-dashed border-destructive/40 rounded-2xl bg-destructive/5">
             <p className="text-destructive font-medium">Não consegui carregar o catálogo.</p>
-            <p className="text-sm text-muted-foreground mt-1">Tente recarregar a página em alguns instantes.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tente recarregar a página em alguns instantes.
+            </p>
           </div>
         ) : recipes.length === 0 ? (
           <div className="text-center py-16 sm:py-20 border border-dashed border-border rounded-2xl bg-card/50">
-            <div className="text-5xl mb-4" aria-hidden="true">🍳</div>
+            <div className="text-5xl mb-4" aria-hidden="true">
+              🍳
+            </div>
             <p className="font-serif text-xl font-bold text-foreground">Nenhuma receita ainda</p>
             <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
               Adicione sua primeira receita para começar seu livro online.
@@ -241,7 +318,9 @@ function Index() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 sm:py-20 border border-dashed border-border rounded-2xl bg-card/50">
-            <p className="font-serif text-xl font-bold text-foreground">Nada encontrado por aqui.</p>
+            <p className="font-serif text-xl font-bold text-foreground">
+              Nada encontrado por aqui.
+            </p>
             <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
               Tente outra palavra-chave ou ajuste os filtros para ver mais receitas.
             </p>

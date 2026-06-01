@@ -16,11 +16,19 @@ interface FilterChipsProps {
 
 export function FilterChips({ label, options, value, onChange, disabled }: FilterChipsProps) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn("-mx-1 px-1 overflow-x-auto scrollbar-thin", disabled && "opacity-50 pointer-events-none")}>
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn(
+        "-mx-1 px-1 overflow-x-auto scrollbar-thin",
+        disabled && "opacity-50 pointer-events-none",
+      )}
+    >
       <div className="flex gap-2 min-w-max py-1">
         {options.map((opt) => {
           const active = value === opt.value;
-          const labelText = typeof opt.count === "number" ? `${opt.label} (${opt.count})` : opt.label;
+          const labelText =
+            typeof opt.count === "number" ? `${opt.label} (${opt.count})` : opt.label;
           return (
             <button
               key={opt.value}

@@ -11,7 +11,10 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Entrar — Receitas da Cris" },
-      { name: "description", content: "Faça login para gerenciar suas receitas, avaliações e favoritas." },
+      {
+        name: "description",
+        content: "Faça login para gerenciar suas receitas, avaliações e favoritas.",
+      },
     ],
   }),
   component: LoginPage,
@@ -96,7 +99,7 @@ function LoginPage() {
         <p className="text-muted-foreground mb-8">
           {mode === "signin"
             ? "Acesse sua conta para gerenciar suas receitas."
-            : "A primeira pessoa a se cadastrar vira administradora."}
+            : "Crie a conta da Cris antes de divulgar o link público."}
         </p>
 
         <button
@@ -128,7 +131,9 @@ function LoginPage() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium mb-1.5" htmlFor="email">Email</label>
+            <label className="block text-sm font-medium mb-1.5" htmlFor="email">
+              Email
+            </label>
             <input
               id="email"
               type="email"
@@ -140,7 +145,9 @@ function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5" htmlFor="password">Senha</label>
+            <label className="block text-sm font-medium mb-1.5" htmlFor="password">
+              Senha
+            </label>
             <input
               id="password"
               type="password"
@@ -173,14 +180,20 @@ function LoginPage() {
           {mode === "signin" ? (
             <>
               Ainda não tem conta?{" "}
-              <button onClick={() => setMode("signup")} className="text-primary font-medium hover:underline">
+              <button
+                onClick={() => setMode("signup")}
+                className="text-primary font-medium hover:underline"
+              >
                 Criar conta
               </button>
             </>
           ) : (
             <>
               Já tem uma conta?{" "}
-              <button onClick={() => setMode("signin")} className="text-primary font-medium hover:underline">
+              <button
+                onClick={() => setMode("signin")}
+                className="text-primary font-medium hover:underline"
+              >
                 Entrar
               </button>
             </>
@@ -188,7 +201,9 @@ function LoginPage() {
         </p>
 
         <p className="text-xs text-muted-foreground/80 mt-8 text-center">
-          <Link to="/" className="hover:text-primary">← Voltar ao catálogo</Link>
+          <Link to="/" className="hover:text-primary">
+            ← Voltar ao catálogo
+          </Link>
         </p>
       </div>
     </div>
@@ -198,10 +213,22 @@ function LoginPage() {
 function GoogleLogo() {
   return (
     <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
-      <path fill="#FF3D00" d="M6.3 14.1l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.1z" />
-      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.6 5.1C9.5 39.5 16.2 44 24 44z" />
-      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.5l6.2 5.3C40.9 36.6 44 31 44 24c0-1.3-.1-2.4-.4-3.5z" />
+      <path
+        fill="#FFC107"
+        d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"
+      />
+      <path
+        fill="#FF3D00"
+        d="M6.3 14.1l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.1z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.6 5.1C9.5 39.5 16.2 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.5l6.2 5.3C40.9 36.6 44 31 44 24c0-1.3-.1-2.4-.4-3.5z"
+      />
     </svg>
   );
 }

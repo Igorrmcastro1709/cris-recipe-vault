@@ -3,12 +3,14 @@
 ## Diagnóstico atual
 
 **Pontos fortes**
+
 - Estrutura TanStack Start limpa, com rotas separadas (`/`, `/adicionar`, `/validar`).
 - Design system coerente: tokens em `oklch`, fontes Fraunces + Inter, paleta acolhedora.
 - Catálogo já com busca, filtro de categoria e filtro de fonte.
 - Dados tipados em `src/lib/recipes.ts` a partir de JSON estático.
 
 **Limitações principais**
+
 - Receita não tem página/modal de detalhe — ingredientes e passos existem nos dados, mas o usuário nunca os vê.
 - Card mostra pouca informação útil (sem porções, sem rating, sem status).
 - Não há persistência real: `/adicionar` salva drafts em `localStorage`, `/validar` só lê do JSON.
@@ -81,12 +83,14 @@ Substituir o JSON estático e o localStorage por um backend real.
 ## Melhorias transversais (em todas as fases)
 
 **Mobile**
+
 - Header com menu hambúrguer abaixo de 640px.
 - Filtros como bottom sheet no mobile (usar `Drawer` do shadcn).
 - Card em layout horizontal compacto opcional para listas longas.
 - Botões de ação principais com altura mínima 44px.
 
 **Acessibilidade & legibilidade**
+
 - Auditoria de contraste (WCAG AA) em todos os tokens; ajustar `--accent` se necessário.
 - `prefers-reduced-motion` respeitado nas transições do card.
 - Tamanhos de fonte fluidos (`clamp()`) para títulos.
@@ -94,6 +98,7 @@ Substituir o JSON estático e o localStorage por um backend real.
 - `lang="pt-BR"` no root, landmarks semânticos (`<main>`, `<nav>`, `<search>`).
 
 **Qualidade técnica**
+
 - Extrair tipos compartilhados para `src/lib/types.ts`.
 - Hook `useRecipes()` que abstrai fonte (JSON hoje, Cloud depois) — facilita a migração da Fase 5.
 - Testes leves dos filtros e do rating com Vitest.

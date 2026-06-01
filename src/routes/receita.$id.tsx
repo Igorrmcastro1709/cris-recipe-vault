@@ -19,6 +19,7 @@ import { StarRating } from "@/components/StarRating";
 import { StatusButtons } from "@/components/StatusButtons";
 import { fetchRecipeById, type Recipe } from "@/lib/recipes";
 import { useRecipeMeta } from "@/lib/user-meta";
+import { useAuth } from "@/lib/auth";
 
 const sourceMeta: Record<Recipe["source"], { label: string; icon: typeof Instagram }> = {
   instagram: { label: "Instagram", icon: Instagram },
@@ -30,21 +31,25 @@ const sourceMeta: Record<Recipe["source"], { label: string; icon: typeof Instagr
 
 export const Route = createFileRoute("/receita/$id")({
   head: () => ({
-    meta: [
-      { title: "Receita — Receitas da Cris" },
-    ],
+    meta: [{ title: "Receita — Receitas da Cris" }],
   }),
   component: RecipeDetail,
 });
 
 function RecipeDetail() {
   const { id } = Route.useParams();
-  const { data: recipe, isLoading, error } = useQuery({
-    queryKey: ["recipe", id],
-    queryFn: () => fetchRecipeById(id),
+  const { isAdmin, loading: authLoading } = useAuth();
+  const {
+    data: recipe,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["recipe", id, isAdmin],
+    queryFn: () => fetchRecipeById(id, { includeDrafts: isAdmin }),
+    enabled: !authLoading,
   });
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -62,7 +67,9 @@ function RecipeDetail() {
         <div className="max-w-3xl mx-auto px-6 py-20 text-center">
           <h1 className="font-serif text-3xl font-bold mb-3">Receita não encontrada</h1>
           <p className="text-muted-foreground mb-6">Talvez ela ainda não tenha sido validada.</p>
-          <Link to="/" className="text-primary font-medium hover:underline">← Voltar ao catálogo</Link>
+          <Link to="/" className="text-primary font-medium hover:underline">
+            ← Voltar ao catálogo
+          </Link>
         </div>
       </div>
     );
@@ -81,7 +88,10 @@ function Detail({ recipe }: { recipe: Recipe }) {
       <Header />
 
       <div className="max-w-5xl mx-auto px-6 pt-6 flex items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition"
+        >
           <ArrowLeft size={14} aria-hidden="true" /> Catálogo
         </Link>
         <button
@@ -97,9 +107,15 @@ function Detail({ recipe }: { recipe: Recipe }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
           <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-md">
             {recipe.image ? (
-              <img src={recipe.image} alt={`Foto da receita: ${recipe.title}`} className="w-full h-full object-cover" />
+              <img
+                src={recipe.image}
+                alt={`Foto da receita: ${recipe.title}`}
+                className="w-full h-full object-cover"
+              />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">Sem imagem</div>
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+                Sem imagem
+              </div>
             )}
             {!recipe.validated && (
               <span className="absolute top-3 right-3 bg-accent text-accent-foreground text-xs font-semibold px-2.5 py-1 rounded-full">
@@ -109,39 +125,59 @@ function Detail({ recipe }: { recipe: Recipe }) {
           </div>
 
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">{recipe.category}</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">
+              {recipe.category}
+            </p>
             <h1 className="font-serif font-bold text-foreground leading-tight mt-2 text-[clamp(1.75rem,4vw,2.75rem)]">
               {recipe.title}
             </h1>
 
             <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              {recipe.time && <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden="true" /> {recipe.time}</span>}
-              {recipe.difficulty && <span className="inline-flex items-center gap-1.5"><ChefHat size={14} aria-hidden="true" /> {recipe.difficulty}</span>}
+              {recipe.time && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock size={14} aria-hidden="true" /> {recipe.time}
+                </span>
+              )}
+              {recipe.difficulty && (
+                <span className="inline-flex items-center gap-1.5">
+                  <ChefHat size={14} aria-hidden="true" /> {recipe.difficulty}
+                </span>
+              )}
               <a
                 href={recipe.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline"
               >
-                <SourceIcon size={14} aria-hidden="true" /> {sourceLabel} <ExternalLink size={12} aria-hidden="true" />
+                <SourceIcon size={14} aria-hidden="true" /> {sourceLabel}{" "}
+                <ExternalLink size={12} aria-hidden="true" />
               </a>
             </div>
 
             {recipe.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {recipe.tags.map((t) => (
-                  <span key={t} className="text-xs bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full">{t}</span>
+                  <span
+                    key={t}
+                    className="text-xs bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full"
+                  >
+                    {t}
+                  </span>
                 ))}
               </div>
             )}
 
             <div className="mt-6 space-y-4 p-5 rounded-2xl bg-card border border-border/60">
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">Sua nota</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                  Sua nota
+                </p>
                 <StarRating value={meta.rating} onChange={setRating} />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">Status</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                  Status
+                </p>
                 <StatusButtons value={meta.status} onToggle={toggleStatus} />
               </div>
             </div>
@@ -150,7 +186,12 @@ function Detail({ recipe }: { recipe: Recipe }) {
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-5 gap-10">
           <section className="md:col-span-2" aria-labelledby="ingredientes-heading">
-            <h2 id="ingredientes-heading" className="font-serif text-2xl font-bold text-foreground mb-4">Ingredientes</h2>
+            <h2
+              id="ingredientes-heading"
+              className="font-serif text-2xl font-bold text-foreground mb-4"
+            >
+              Ingredientes
+            </h2>
             {recipe.ingredients.length === 0 ? (
               <p className="text-sm text-muted-foreground">Ainda sem ingredientes cadastrados.</p>
             ) : (
@@ -165,7 +206,11 @@ function Detail({ recipe }: { recipe: Recipe }) {
                         className="mt-0.5 w-5 h-5 shrink-0 rounded-md border-border accent-primary cursor-pointer"
                         aria-label={`Marcar ${ing}`}
                       />
-                      <span className={`transition-colors duration-200 leading-relaxed ${checked[i] ? "line-through text-muted-foreground" : "text-foreground"}`}>{ing}</span>
+                      <span
+                        className={`transition-colors duration-200 leading-relaxed ${checked[i] ? "line-through text-muted-foreground" : "text-foreground"}`}
+                      >
+                        {ing}
+                      </span>
                     </label>
                   </li>
                 ))}
@@ -174,7 +219,9 @@ function Detail({ recipe }: { recipe: Recipe }) {
           </section>
 
           <section className="md:col-span-3" aria-labelledby="passos-heading">
-            <h2 id="passos-heading" className="font-serif text-2xl font-bold text-foreground mb-4">Passo a passo</h2>
+            <h2 id="passos-heading" className="font-serif text-2xl font-bold text-foreground mb-4">
+              Passo a passo
+            </h2>
             {recipe.steps.length === 0 ? (
               <p className="text-sm text-muted-foreground">Ainda sem passo a passo cadastrado.</p>
             ) : (

@@ -26,20 +26,18 @@ async function fetchIsAdmin(userId: string): Promise<boolean> {
 }
 
 async function ensureProfile(user: User) {
-  await supabase
-    .from("profiles")
-    .upsert(
-      {
-        user_id: user.id,
-        display_name:
-          (user.user_metadata?.full_name as string | undefined) ??
-          (user.user_metadata?.name as string | undefined) ??
-          user.email?.split("@")[0] ??
-          null,
-        avatar_url: (user.user_metadata?.avatar_url as string | undefined) ?? null,
-      },
-      { onConflict: "user_id", ignoreDuplicates: false },
-    );
+  await supabase.from("profiles").upsert(
+    {
+      user_id: user.id,
+      display_name:
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        user.email?.split("@")[0] ??
+        null,
+      avatar_url: (user.user_metadata?.avatar_url as string | undefined) ?? null,
+    },
+    { onConflict: "user_id", ignoreDuplicates: false },
+  );
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -52,7 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Listener FIRST, then getSession (per Supabase docs)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
@@ -62,7 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
             await ensureProfile(newSession.user);
             // First user becomes admin (no-op if already exists)
-            try { await supabase.rpc("claim_admin_if_first"); } catch { /* ignore */ }
+            try {
+              await supabase.rpc("claim_admin_if_first");
+            } catch {
+              /* ignore */
+            }
           }
           const admin = await fetchIsAdmin(newSession.user.id);
           setIsAdmin(admin);
@@ -76,11 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries();
     });
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
       setUser(data.session?.user ?? null);
       if (data.session?.user) {
-        fetchIsAdmin(data.session.user.id).then(setIsAdmin);
+        const admin = await fetchIsAdmin(data.session.user.id);
+        setIsAdmin(admin);
+      } else {
+        setIsAdmin(false);
       }
       setLoading(false);
     });

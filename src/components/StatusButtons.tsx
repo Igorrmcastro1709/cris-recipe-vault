@@ -16,7 +16,11 @@ const items: { status: Exclude<RecipeStatus, "nenhum">; label: string; icon: typ
 
 export function StatusButtons({ value, onToggle, size = "md" }: StatusButtonsProps) {
   return (
-    <div role="group" aria-label="Status pessoal" className="inline-flex items-center gap-1.5 flex-wrap">
+    <div
+      role="group"
+      aria-label="Status pessoal"
+      className="inline-flex items-center gap-1.5 flex-wrap"
+    >
       {items.map(({ status, label, icon: Icon }) => {
         const active = value === status;
         return (
@@ -33,7 +37,11 @@ export function StatusButtons({ value, onToggle, size = "md" }: StatusButtonsPro
                 : "bg-background text-foreground/75 border-border hover:border-primary/50 hover:text-foreground",
             )}
           >
-            <Icon size={size === "sm" ? 12 : 15} aria-hidden="true" className={cn(active && status === "favorita" && "fill-current")} />
+            <Icon
+              size={size === "sm" ? 12 : 15}
+              aria-hidden="true"
+              className={cn(active && status === "favorita" && "fill-current")}
+            />
             {label}
           </button>
         );

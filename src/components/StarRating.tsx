@@ -10,7 +10,13 @@ interface StarRatingProps {
   label?: string;
 }
 
-export function StarRating({ value, onChange, size = 20, readOnly = false, label = "Avaliação" }: StarRatingProps) {
+export function StarRating({
+  value,
+  onChange,
+  size = 20,
+  readOnly = false,
+  label = "Avaliação",
+}: StarRatingProps) {
   const [hover, setHover] = useState(0);
   const display = hover || value;
 
@@ -59,7 +65,9 @@ export function StarRating({ value, onChange, size = 20, readOnly = false, label
               aria-hidden="true"
               className={cn(
                 "transition-colors",
-                active ? "fill-primary text-primary" : "text-muted-foreground/40 hover:text-primary/60",
+                active
+                  ? "fill-primary text-primary"
+                  : "text-muted-foreground/40 hover:text-primary/60",
               )}
             />
           </button>

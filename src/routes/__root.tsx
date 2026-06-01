@@ -73,24 +73,44 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Cris's Recipe Book is a static website for organizing and discovering recipes from various online sources." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Cris's Recipe Book is a static website for organizing and discovering recipes from various online sources." },
+      { title: "Receitas da Cris" },
+      {
+        name: "description",
+        content:
+          "Catálogo online para salvar, validar e cozinhar receitas vindas de Instagram, PDFs, vídeos, imagens e links.",
+      },
+      { name: "author", content: "Receitas da Cris" },
+      { property: "og:title", content: "Receitas da Cris" },
+      {
+        property: "og:description",
+        content: "Catálogo online para salvar, validar e cozinhar receitas de diferentes fontes.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "Cris's Recipe Book is a static website for organizing and discovering recipes from various online sources." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/53eee67b-f47e-4c21-818a-2cc1f725bf1e/id-preview-cb4c391e--139db4d7-a8f0-48a1-9e1f-381c3e6fee01.lovable.app-1778455180122.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/53eee67b-f47e-4c21-818a-2cc1f725bf1e/id-preview-cb4c391e--139db4d7-a8f0-48a1-9e1f-381c3e6fee01.lovable.app-1778455180122.png" },
+      { name: "twitter:title", content: "Receitas da Cris" },
+      {
+        name: "twitter:description",
+        content: "Catálogo online para salvar, validar e cozinhar receitas de diferentes fontes.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/53eee67b-f47e-4c21-818a-2cc1f725bf1e/id-preview-cb4c391e--139db4d7-a8f0-48a1-9e1f-381c3e6fee01.lovable.app-1778455180122.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/53eee67b-f47e-4c21-818a-2cc1f725bf1e/id-preview-cb4c391e--139db4d7-a8f0-48a1-9e1f-381c3e6fee01.lovable.app-1778455180122.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -101,7 +121,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
