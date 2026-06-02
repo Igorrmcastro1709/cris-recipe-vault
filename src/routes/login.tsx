@@ -27,6 +27,10 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [formMessage, setFormMessage] = useState<{
+    type: "error" | "success";
+    text: string;
+  } | null>(null);
 
   if (!loading && user) {
     // Already signed in — bounce home
@@ -36,9 +40,10 @@ function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    setFormMessage(null);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -47,8 +52,14 @@ function LoginPage() {
           },
         });
         if (error) throw error;
-        toast.success("Conta criada! Você já está logada.");
-        navigate({ to: "/" });
+        if (data.session) {
+          toast.success("Conta criada! Você já está logada.");
+          navigate({ to: "/" });
+        } else {
+          const text = "Conta criada. Confira seu email para confirmar o cadastro antes de entrar.";
+          setFormMessage({ type: "success", text });
+          toast.success(text);
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -57,6 +68,7 @@ function LoginPage() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro inesperado";
+      setFormMessage({ type: "error", text: msg });
       toast.error(msg);
     } finally {
       setBusy(false);
@@ -65,6 +77,7 @@ function LoginPage() {
 
   const handleGoogle = async () => {
     setBusy(true);
+    setFormMessage(null);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -75,6 +88,7 @@ function LoginPage() {
       if (error) throw error;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro no login com Google";
+      setFormMessage({ type: "error", text: msg });
       toast.error(msg);
       setBusy(false);
     }
@@ -109,6 +123,18 @@ function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {formMessage && (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                formMessage.type === "error"
+                  ? "border-destructive/30 bg-destructive/10 text-destructive"
+                  : "border-primary/30 bg-primary/10 text-primary"
+              }`}
+            >
+              {formMessage.text}
+            </div>
+          )}
+
           {mode === "signup" && (
             <div>
               <label className="block text-sm font-medium mb-1.5" htmlFor="name">
