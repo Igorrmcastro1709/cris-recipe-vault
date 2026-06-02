@@ -4,7 +4,6 @@ import { Loader2, LogIn, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "@/components/Header";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
@@ -67,18 +66,13 @@ function LoginPage() {
   const handleGoogle = async () => {
     setBusy(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
       });
-      if (result.error) {
-        const msg = result.error instanceof Error ? result.error.message : String(result.error);
-        toast.error(msg);
-        setBusy(false);
-        return;
-      }
-      if (result.redirected) return;
-      toast.success("Bem-vinda!");
-      navigate({ to: "/" });
+      if (error) throw error;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro no login com Google";
       toast.error(msg);
