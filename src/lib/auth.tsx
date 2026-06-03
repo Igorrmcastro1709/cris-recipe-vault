@@ -9,18 +9,20 @@ interface AuthState {
   session: Session | null;
   isAdmin: boolean;
   loading: boolean;
+  adminError: string | null;
+  refreshAdmin: () => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
-async function fetchIsAdmin(userId: string): Promise<boolean> {
+async function fetchIsAdmin(userId: string): Promise<{ isAdmin: boolean; error: string | null }> {
   const { data, error } = await supabase.rpc("has_role", {
     _user_id: userId,
     _role: "admin",
   });
-  if (error) return false;
-  return data === true;
+  if (error) return { isAdmin: false, error: error.message };
+  return { isAdmin: data === true, error: null };
 }
 
 async function ensureProfile(user: User) {
@@ -42,15 +44,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
   const router = useRouter();
+
+  const refreshAdmin = async (targetUser = user) => {
+    if (!targetUser) {
+      setIsAdmin(false);
+      setAdminError(null);
+      return false;
+    }
+
+    const result = await fetchIsAdmin(targetUser.id);
+    setIsAdmin(result.isAdmin);
+    setAdminError(result.error);
+    router.invalidate();
+    queryClient.invalidateQueries();
+    return result.isAdmin;
+  };
 
   useEffect(() => {
     // Listener FIRST, then getSession (per Supabase docs)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
+      setLoading(true);
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
@@ -66,11 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               /* ignore */
             }
           }
-          const admin = await fetchIsAdmin(newSession.user.id);
-          setIsAdmin(admin);
+          await refreshAdmin(newSession.user);
+          setLoading(false);
         }, 0);
       } else {
         setIsAdmin(false);
+        setAdminError(null);
+        setLoading(false);
       }
 
       // Invalidate every query so user-scoped data refreshes
@@ -82,10 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser(data.session?.user ?? null);
       if (data.session?.user) {
-        const admin = await fetchIsAdmin(data.session.user.id);
-        setIsAdmin(admin);
+        const result = await fetchIsAdmin(data.session.user.id);
+        setIsAdmin(result.isAdmin);
+        setAdminError(result.error);
       } else {
         setIsAdmin(false);
+        setAdminError(null);
       }
       setLoading(false);
     });
@@ -99,7 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, isAdmin, loading, adminError, refreshAdmin, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

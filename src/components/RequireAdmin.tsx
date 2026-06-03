@@ -1,11 +1,11 @@
 import { type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Loader2, ShieldAlert, LogIn } from "lucide-react";
+import { Loader2, ShieldAlert, LogIn, RefreshCw } from "lucide-react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth";
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, adminError, refreshAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -47,12 +47,26 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
           <p className="text-muted-foreground mb-6">
             Esta área é só para administradoras. Você pode navegar pelo catálogo livremente.
           </p>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition"
-          >
-            Voltar ao catálogo
-          </Link>
+          {adminError && (
+            <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Erro ao verificar permissão: {adminError}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => void refreshAdmin()}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold transition hover:bg-muted"
+            >
+              <RefreshCw size={15} aria-hidden="true" /> Verificar permissão
+            </button>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition"
+            >
+              Voltar ao catálogo
+            </Link>
+          </div>
         </div>
       </div>
     );
