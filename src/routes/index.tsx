@@ -5,7 +5,7 @@ import { Search, X, Loader2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
 import { FilterChips, type ChipOption } from "@/components/FilterChips";
-import { fetchRecipes, type SourceType } from "@/lib/recipes";
+import { fetchRecipes, type Recipe, type SourceType } from "@/lib/recipes";
 import { useAllUserMeta } from "@/lib/user-meta";
 import { useAuth } from "@/lib/auth";
 
@@ -134,7 +134,8 @@ function Index() {
   }, [recipes, isAdmin]);
 
   const filtered = useMemo(() => {
-    const query = q.toLowerCase().trim();
+    const query = normalizeSearch(q);
+    const queryTerms = query.split(" ").filter(Boolean);
     const list = recipes.filter((r) => {
       if (cat !== "all" && r.category !== cat) return false;
       if (src !== "all" && r.source !== src) return false;
@@ -155,15 +156,8 @@ function Index() {
           if (!m || m.rating <= 0) return false;
         } else if (m?.status !== statusFilter) return false;
       }
-      if (!query) return true;
-      return (
-        r.title.toLowerCase().includes(query) ||
-        r.category.toLowerCase().includes(query) ||
-        r.tags.some((t) => t.toLowerCase().includes(query)) ||
-        r.ingredients.some((i) => i.toLowerCase().includes(query)) ||
-        r.steps.some((s) => s.toLowerCase().includes(query)) ||
-        (r.notes?.toLowerCase().includes(query) ?? false)
-      );
+      if (queryTerms.length === 0) return true;
+      return recipeMatchesTerms(r, queryTerms);
     });
     if (statusFilter === "avaliadas") {
       return [...list].sort(
@@ -230,6 +224,50 @@ function Index() {
             Centralize posts do Instagram, PDFs, vídeos e links em um catálogo pesquisável, com
             ingredientes, fontes e passo a passo.
           </p>
+          <form
+            role="search"
+            aria-label="Busca rápida de receitas"
+            className="mt-8 max-w-2xl"
+            onSubmit={(event) => {
+              event.preventDefault();
+              document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            <label
+              htmlFor="quick-recipe-search"
+              className="block text-xs uppercase tracking-[0.18em] text-primary font-semibold mb-2"
+            >
+              Busca rápida
+            </label>
+            <div className="relative">
+              <Search
+                size={20}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <input
+                id="quick-recipe-search"
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Digite uma palavra-chave: fubá, frango, airfryer, bolo..."
+                className="w-full pl-12 pr-12 py-4 bg-card rounded-2xl border border-border/70 shadow-sm focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring text-base"
+              />
+              {q && (
+                <button
+                  type="button"
+                  onClick={() => setQ("")}
+                  aria-label="Limpar busca rápida"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Busca por título, categoria, tags, ingredientes, passos, notas e link da fonte.
+            </p>
+          </form>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               to={user ? "/adicionar" : "/login"}
@@ -269,7 +307,7 @@ function Index() {
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar por nome, tag ou ingrediente..."
+              placeholder="Buscar por palavra-chave..."
               className="w-full pl-11 pr-10 py-3 bg-background rounded-xl border border-border focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card text-sm"
             />
             {q && (
@@ -414,4 +452,32 @@ function Index() {
       </footer>
     </div>
   );
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function recipeMatchesTerms(recipe: Recipe, terms: string[]) {
+  const searchableText = normalizeSearch(
+    [
+      recipe.title,
+      recipe.category,
+      recipe.source,
+      recipe.sourceUrl,
+      recipe.time,
+      recipe.difficulty,
+      recipe.tags.join(" "),
+      recipe.ingredients.join(" "),
+      recipe.steps.join(" "),
+      recipe.notes ?? "",
+    ].join(" "),
+  );
+
+  return terms.every((term) => searchableText.includes(term));
 }
