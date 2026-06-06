@@ -23,7 +23,13 @@ import {
 import { Header } from "@/components/Header";
 import { RecipeCard } from "@/components/RecipeCard";
 import { RequireAdmin } from "@/components/RequireAdmin";
-import { createRecipe, fetchRecipes, type Recipe, type SourceType } from "@/lib/recipes";
+import {
+  createRecipe,
+  fetchRecipes,
+  type ExtractionStatus,
+  type Recipe,
+  type SourceType,
+} from "@/lib/recipes";
 
 export const Route = createFileRoute("/adicionar")({
   head: () => ({
@@ -44,7 +50,7 @@ export const Route = createFileRoute("/adicionar")({
 });
 
 const AUTOSAVE_KEY = "receitas-da-cris:form-autosave";
-const AI_KEY_STORAGE = "cris_claude_key";
+const LOCAL_AI_BRIDGE_URL = "http://127.0.0.1:3877";
 
 const sourceOptions: {
   value: SourceType;
@@ -91,6 +97,7 @@ const sourceOptions: {
 ];
 
 const sourceValues = sourceOptions.map((s) => s.value) as [SourceType, ...SourceType[]];
+type ExtractSourceType = SourceType | "text";
 
 const schema = z
   .object({
@@ -98,7 +105,13 @@ const schema = z
     title: z.string().trim().min(1, "Dê um nome para a receita").max(120),
     category: z.string().trim().min(1, "Escolha ou crie uma categoria").max(60),
     source: z.enum(sourceValues),
-    sourceUrl: z.string().trim().url("Cole um link válido (começando com http)"),
+    sourceUrl: z
+      .string()
+      .trim()
+      .url("Cole um link válido (começando com http)")
+      .or(z.literal(""))
+      .optional()
+      .default(""),
     image: z
       .string()
       .trim()
@@ -115,6 +128,12 @@ const schema = z
       .default([]),
     steps: z.array(z.object({ value: z.string().trim().min(1, "Passo vazio") })).default([]),
     notes: z.string().max(1000).optional().default(""),
+    extractionStatus: z
+      .enum(["manual", "ai_extracted", "needs_review"])
+      .optional()
+      .default("manual"),
+    rawSourceText: z.string().optional().default(""),
+    extractionWarnings: z.array(z.string()).optional().default([]),
   })
   .superRefine((data, ctx) => {
     if (data.mode !== "full") return;
@@ -175,6 +194,9 @@ function Adicionar() {
       ingredients: [],
       steps: [],
       notes: "",
+      extractionStatus: "manual",
+      rawSourceText: "",
+      extractionWarnings: [],
     },
   });
 
@@ -230,6 +252,9 @@ function Adicionar() {
       tagsInput: "",
       ingredients: next === "full" ? [{ value: "" }] : [],
       steps: next === "full" ? [{ value: "" }] : [],
+      extractionStatus: "manual" as const,
+      rawSourceText: "",
+      extractionWarnings: [],
     };
     reset(base);
   };
@@ -256,6 +281,13 @@ function Adicionar() {
         ingredients: isFull ? (data.ingredients ?? []).map((i) => i.value).filter(Boolean) : [],
         steps: isFull ? (data.steps ?? []).map((s) => s.value).filter(Boolean) : [],
         notes: (data.notes ?? "").trim() || null,
+        extractionStatus: data.extractionStatus ?? "manual",
+        rawSourceText: (data.rawSourceText ?? "").trim() || null,
+        extractionWarnings: data.extractionWarnings ?? [],
+        extractedAt:
+          data.extractionStatus && data.extractionStatus !== "manual"
+            ? new Date().toISOString()
+            : null,
       });
     },
     onSuccess: () => {
@@ -297,6 +329,9 @@ function Adicionar() {
       ingredients: data.ingredients?.length ? data.ingredients : [{ value: "" }],
       steps: data.steps?.length ? data.steps : [{ value: "" }],
       notes: data.notes ?? "",
+      extractionStatus: data.extractionStatus ?? "needs_review",
+      rawSourceText: data.rawSourceText ?? "",
+      extractionWarnings: data.extractionWarnings ?? [],
     });
   };
 
@@ -324,6 +359,10 @@ function Adicionar() {
       ingredients: isFull ? (values.ingredients ?? []).map((i) => i.value).filter(Boolean) : [],
       steps: isFull ? (values.steps ?? []).map((s) => s.value).filter(Boolean) : [],
       validated: false,
+      extractionStatus: (values.extractionStatus ?? "manual") as ExtractionStatus,
+      rawSourceText: values.rawSourceText ?? null,
+      extractionWarnings: values.extractionWarnings ?? [],
+      extractedAt: null,
     };
   }, [values]);
 
@@ -421,7 +460,6 @@ function Adicionar() {
             <Field
               label="Link ou URL da fonte"
               id="sourceUrl"
-              required
               hint={currentSource.hint}
               error={formState.errors.sourceUrl?.message}
             >
@@ -708,115 +746,70 @@ function Adicionar() {
 /* ---------- AI extraction ---------- */
 
 function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) => void }) {
-  const [apiKey, setApiKey] = useState(() => {
-    try {
-      return localStorage.getItem(AI_KEY_STORAGE) ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const [showKey, setShowKey] = useState(false);
   const [url, setUrl] = useState("");
   const [rawText, setRawText] = useState("");
+  const [sourceType, setSourceType] = useState<ExtractSourceType>("instagram");
   const [status, setStatus] = useState<{
-    type: "idle" | "loading" | "success" | "error";
+    type: "idle" | "loading" | "success" | "error" | "warning";
     msg: string;
   }>({ type: "idle", msg: "" });
   const [open, setOpen] = useState(false);
 
-  const saveKey = () => {
-    try {
-      localStorage.setItem(AI_KEY_STORAGE, apiKey);
-    } catch {
-      /* noop */
-    }
-  };
-
   const extract = async () => {
-    if (!apiKey.trim()) {
-      setStatus({ type: "error", msg: "Configure sua chave Claude API primeiro." });
-      setOpen(true);
-      return;
-    }
     if (!url.trim() && !rawText.trim()) {
       setStatus({ type: "error", msg: "Cole uma URL ou o texto da receita." });
       return;
     }
 
-    saveKey();
-    let content = rawText.trim();
-
-    if (url.trim()) {
-      setStatus({ type: "loading", msg: "Buscando conteúdo da URL…" });
-      try {
-        const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(url.trim())}`;
-        const res = await fetch(proxyUrl);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, "text/html");
-        content = (doc.body.innerText ?? "").slice(0, 8000);
-      } catch {
-        setStatus({
-          type: "error",
-          msg: "Não consegui carregar a URL. Cole o texto da receita no campo abaixo.",
-        });
-        return;
-      }
-    }
-
-    setStatus({ type: "loading", msg: "Extraindo receita com IA…" });
+    setStatus({ type: "loading", msg: "Conversando com a IA local no seu Mac…" });
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch(`${LOCAL_AI_BRIDGE_URL}/extract-recipe`, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": apiKey.trim(),
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 2048,
-          system: `You are a recipe extraction assistant. Extract recipe information from the provided text and return ONLY a valid JSON object with this exact schema (no markdown, no explanation, no code fences):
-{"title":"string","category":"string (e.g. Doces, Pães, Saladas, Massas, Sopas, Carnes, Frango, Vegetariano)","time":"string (e.g. 30min, 1h 20min)","difficulty":"Fácil" or "Médio" or "Difícil","servings":number or null,"tagsInput":"comma-separated tags","ingredients":["string",...],"steps":["string",...],"notes":"string or null"}`,
-          messages: [
-            { role: "user", content: `Extract recipe data from this text:\n\n${content}` },
-          ],
+          sourceType,
+          sourceUrl: url.trim(),
+          rawText: rawText.trim(),
         }),
       });
 
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        throw new Error(err.error?.message ?? `HTTP ${res.status}`);
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? `Erro HTTP ${res.status}`);
       }
 
-      const json = (await res.json()) as { content?: { text?: string }[] };
-      const text = (json.content?.[0]?.text ?? "").trim();
-      const parsed = JSON.parse(text) as {
+      const parsed = (await res.json()) as {
         title?: string;
         category?: string;
+        image?: string;
         time?: string;
         difficulty?: string;
         servings?: number | null;
-        tagsInput?: string;
+        tags?: string[];
         ingredients?: string[];
         steps?: string[];
         notes?: string | null;
+        confidence?: "high" | "medium" | "low";
+        warnings?: string[];
       };
 
       const validDiff = ["Fácil", "Médio", "Difícil"];
+      const mappedSource: SourceType = sourceType === "text" ? "link" : sourceType;
+      const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.filter(Boolean) : [];
+      const confidence = parsed.confidence ?? "medium";
       const extracted: Partial<FormValues> = {
         title: parsed.title ?? "",
         category: parsed.category ?? "",
-        source: "link",
+        source: mappedSource,
         sourceUrl: url.trim() || "",
+        image: parsed.image ?? "",
         time: parsed.time ?? "",
         difficulty: validDiff.includes(parsed.difficulty ?? "")
           ? (parsed.difficulty as FormValues["difficulty"])
           : "Fácil",
         servings: parsed.servings ?? undefined,
-        tagsInput: parsed.tagsInput ?? "",
+        tagsInput: Array.isArray(parsed.tags) ? parsed.tags.join(", ") : "",
         ingredients:
           Array.isArray(parsed.ingredients) && parsed.ingredients.length
             ? parsed.ingredients.map((v) => ({ value: String(v) }))
@@ -826,17 +819,25 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
             ? parsed.steps.map((v) => ({ value: String(v) }))
             : [{ value: "" }],
         notes: parsed.notes ?? "",
+        extractionStatus:
+          confidence === "high" && warnings.length === 0 ? "ai_extracted" : "needs_review",
+        rawSourceText: rawText.trim(),
+        extractionWarnings: warnings,
       };
 
       onExtracted(extracted);
       setStatus({
-        type: "success",
+        type: warnings.length ? "warning" : "success",
         msg: `"${parsed.title ?? "Receita"}" extraída com sucesso! Revise os campos e salve.`,
       });
     } catch (e) {
+      const message = e instanceof Error ? e.message : "Erro ao processar a resposta da IA.";
       setStatus({
         type: "error",
-        msg: e instanceof Error ? e.message : "Erro ao processar a resposta da IA.",
+        msg:
+          message.includes("Failed to fetch") || message.includes("NetworkError")
+            ? "Serviço local indisponível. Abra o Terminal na pasta do projeto e rode: npm run ai:local"
+            : message,
       });
     }
   };
@@ -858,32 +859,29 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
 
       {open && (
         <div className="px-6 pb-6 space-y-4 border-t border-border/60 pt-5">
-          {/* API Key */}
           <div>
-            <label htmlFor="ai-key" className="block text-sm font-medium text-foreground mb-2">
-              Chave Claude API <span className="text-primary">*</span>
+            <label
+              htmlFor="ai-source-type"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
+              Tipo de conteúdo
             </label>
-            <div className="relative">
-              <input
-                id="ai-key"
-                type={showKey ? "text" : "password"}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                onBlur={saveKey}
-                placeholder="sk-ant-api03-..."
-                className={`${inputClass(false)} pr-10`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey((p) => !p)}
-                aria-label={showKey ? "Ocultar chave" : "Mostrar chave"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition"
-              >
-                <Eye size={14} aria-hidden="true" />
-              </button>
-            </div>
+            <select
+              id="ai-source-type"
+              value={sourceType}
+              onChange={(event) => setSourceType(event.target.value as ExtractSourceType)}
+              className={inputClass(false)}
+            >
+              <option value="instagram">Instagram</option>
+              <option value="link">Link / Site</option>
+              <option value="video">Vídeo</option>
+              <option value="pdf">PDF</option>
+              <option value="image">Imagem</option>
+              <option value="text">Texto colado</option>
+            </select>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Chave salva apenas no seu navegador — nunca enviada para nossos servidores.
+              Para Instagram, cole o link e também a legenda ou transcrição. O app não acessa posts
+              privados automaticamente.
             </p>
           </div>
 
@@ -897,7 +895,7 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://blogdereceitas.com/bolo-de-fuba"
+              placeholder="https://www.instagram.com/p/... ou https://blogdereceitas.com/..."
               className={inputClass(false)}
             />
           </div>
@@ -923,9 +921,11 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
               className={`text-sm inline-flex items-center gap-1.5 ${
                 status.type === "error"
                   ? "text-destructive"
-                  : status.type === "success"
+                  : status.type === "warning"
                     ? "text-primary"
-                    : "text-muted-foreground"
+                    : status.type === "success"
+                      ? "text-primary"
+                      : "text-muted-foreground"
               }`}
             >
               {status.type === "loading" && (
@@ -948,6 +948,11 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
             )}
             {status.type === "loading" ? "Extraindo…" : "Extrair receita"}
           </button>
+          <p className="text-xs text-muted-foreground">
+            Antes de usar, mantenha a ponte local ligada no Mac com{" "}
+            <code className="font-mono bg-muted px-1.5 py-0.5 rounded">npm run ai:local</code>. A IA
+            preenche o formulário, mas a publicação continua passando pela validação.
+          </p>
         </div>
       )}
     </div>

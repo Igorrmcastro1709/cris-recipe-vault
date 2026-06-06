@@ -10,6 +10,13 @@ import { useAllUserMeta } from "@/lib/user-meta";
 import { useAuth } from "@/lib/auth";
 
 type StatusFilter = "all" | "favorita" | "quero-testar" | "ja-fiz" | "avaliadas";
+type QualityFilter =
+  | "all"
+  | "pending"
+  | "missing-ingredients"
+  | "missing-steps"
+  | "ai-extracted"
+  | "needs-review";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -38,16 +45,17 @@ function Index() {
   const [cat, setCat] = useState<string>("all");
   const [src, setSrc] = useState<SourceType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>("all");
   const userMeta = useAllUserMeta();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   const {
     data: recipes = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["recipes", "validated"],
-    queryFn: () => fetchRecipes({ onlyValidated: true }),
+    queryKey: ["recipes", isAdmin ? "all" : "validated"],
+    queryFn: () => fetchRecipes(isAdmin ? undefined : { onlyValidated: true }),
   });
 
   const categoryOptions = useMemo<ChipOption[]>(() => {
@@ -96,11 +104,51 @@ function Index() {
     ];
   }, [userMeta, recipes]);
 
+  const qualityOptions = useMemo<ChipOption[]>(() => {
+    const count = (predicate: (recipe: (typeof recipes)[number]) => boolean) =>
+      recipes.filter(predicate).length;
+    return [
+      { value: "all", label: "Todas" },
+      ...(isAdmin
+        ? [{ value: "pending", label: "A validar", count: count((r) => !r.validated) }]
+        : []),
+      {
+        value: "missing-ingredients",
+        label: "Sem ingredientes",
+        count: count((r) => r.ingredients.length === 0),
+      },
+      { value: "missing-steps", label: "Sem passos", count: count((r) => r.steps.length === 0) },
+      {
+        value: "ai-extracted",
+        label: "Extraídas por IA",
+        count: count((r) => r.extractionStatus !== "manual"),
+      },
+      {
+        value: "needs-review",
+        label: "Revisar IA",
+        count: count(
+          (r) => r.extractionStatus === "needs_review" || r.extractionWarnings.length > 0,
+        ),
+      },
+    ];
+  }, [recipes, isAdmin]);
+
   const filtered = useMemo(() => {
     const query = q.toLowerCase().trim();
     const list = recipes.filter((r) => {
       if (cat !== "all" && r.category !== cat) return false;
       if (src !== "all" && r.source !== src) return false;
+      if (qualityFilter === "pending" && r.validated) return false;
+      if (qualityFilter === "missing-ingredients" && r.ingredients.length > 0) return false;
+      if (qualityFilter === "missing-steps" && r.steps.length > 0) return false;
+      if (qualityFilter === "ai-extracted" && r.extractionStatus === "manual") return false;
+      if (
+        qualityFilter === "needs-review" &&
+        r.extractionStatus !== "needs_review" &&
+        r.extractionWarnings.length === 0
+      ) {
+        return false;
+      }
       if (statusFilter !== "all") {
         const m = userMeta[r.id];
         if (statusFilter === "avaliadas") {
@@ -123,14 +171,19 @@ function Index() {
       );
     }
     return list;
-  }, [q, cat, src, statusFilter, userMeta, recipes]);
+  }, [q, cat, src, qualityFilter, statusFilter, userMeta, recipes]);
 
   const hasActiveFilter =
-    q.trim() !== "" || cat !== "all" || src !== "all" || statusFilter !== "all";
+    q.trim() !== "" ||
+    cat !== "all" ||
+    src !== "all" ||
+    qualityFilter !== "all" ||
+    statusFilter !== "all";
   const clearFilters = () => {
     setQ("");
     setCat("all");
     setSrc("all");
+    setQualityFilter("all");
     setStatusFilter("all");
   };
 
@@ -266,6 +319,19 @@ function Index() {
               options={statusOptions}
               value={statusFilter}
               onChange={(v) => setStatusFilter(v as StatusFilter)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Qualidade
+            </p>
+            <FilterChips
+              label="Filtrar por qualidade e revisão"
+              options={qualityOptions}
+              value={qualityFilter}
+              onChange={(v) => setQualityFilter(v as QualityFilter)}
+              disabled={recipes.length === 0}
             />
           </div>
         </div>

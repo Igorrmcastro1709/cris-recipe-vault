@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, AlertCircle, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RequireAdmin } from "@/components/RequireAdmin";
-import { fetchRecipes, setRecipeValidated, deleteRecipe } from "@/lib/recipes";
+import { fetchRecipes, setRecipeValidated, deleteRecipe, type Recipe } from "@/lib/recipes";
 
 export const Route = createFileRoute("/validar")({
   head: () => ({
@@ -78,58 +78,15 @@ function Validar() {
             </h2>
             <div className="space-y-4">
               {pending.map((r) => (
-                <div
+                <PendingRecipeCard
                   key={r.id}
-                  className="bg-card border border-border/60 rounded-2xl p-5 flex flex-col md:flex-row gap-5"
-                >
-                  {r.image && (
-                    <img
-                      src={r.image}
-                      alt={r.title}
-                      className="w-full md:w-40 h-32 object-cover rounded-xl"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <p className="text-xs uppercase tracking-wider text-primary font-semibold">
-                      {r.category} • {r.source}
-                    </p>
-                    <h3 className="font-serif text-xl font-bold mt-1">{r.title}</h3>
-                    {r.ingredients.length > 0 && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        <strong className="text-foreground">Ingredientes:</strong>{" "}
-                        {r.ingredients.slice(0, 4).join(", ")}…
-                      </p>
-                    )}
-                    <p className="text-sm text-muted-foreground mt-1">
-                      <strong className="text-foreground">Passos:</strong> {r.steps.length} etapas
-                    </p>
-                    <a
-                      href={r.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-primary text-sm font-medium mt-3 hover:underline"
-                    >
-                      Ver fonte <ExternalLink size={13} />
-                    </a>
-                  </div>
-                  <div className="flex md:flex-col gap-2 md:justify-center">
-                    <button
-                      onClick={() => validate.mutate(r.id)}
-                      disabled={validate.isPending}
-                      className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition disabled:opacity-60"
-                    >
-                      <CheckCircle2 size={15} aria-hidden="true" /> Validar
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Excluir "${r.title}"?`)) remove.mutate(r.id);
-                      }}
-                      className="inline-flex items-center gap-1.5 border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 px-4 py-2 rounded-xl text-sm font-medium transition"
-                    >
-                      <Trash2 size={15} aria-hidden="true" /> Excluir
-                    </button>
-                  </div>
-                </div>
+                  recipe={r}
+                  onValidate={() => validate.mutate(r.id)}
+                  onDelete={() => {
+                    if (confirm(`Excluir "${r.title}"?`)) remove.mutate(r.id);
+                  }}
+                  validating={validate.isPending}
+                />
               ))}
               {pending.length === 0 && <p className="text-muted-foreground">Tudo em dia.</p>}
             </div>
@@ -157,6 +114,100 @@ function Validar() {
             </ul>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function getQualityIssues(recipe: Recipe) {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+
+  if (recipe.ingredients.length === 0) blockers.push("Sem ingredientes cadastrados.");
+  if (recipe.steps.length === 0) blockers.push("Sem passo a passo cadastrado.");
+  if (recipe.extractionStatus === "needs_review") {
+    warnings.push("Extração por IA precisa de revisão.");
+  }
+  warnings.push(...recipe.extractionWarnings);
+
+  return { blockers, warnings: Array.from(new Set(warnings)) };
+}
+
+function PendingRecipeCard({
+  recipe,
+  onValidate,
+  onDelete,
+  validating,
+}: {
+  recipe: Recipe;
+  onValidate: () => void;
+  onDelete: () => void;
+  validating: boolean;
+}) {
+  const { blockers, warnings } = getQualityIssues(recipe);
+  const canValidate = blockers.length === 0;
+
+  return (
+    <div className="bg-card border border-border/60 rounded-2xl p-5 flex flex-col md:flex-row gap-5">
+      {recipe.image && (
+        <img
+          src={recipe.image}
+          alt={recipe.title}
+          className="w-full md:w-40 h-32 object-cover rounded-xl"
+        />
+      )}
+      <div className="flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs uppercase tracking-wider text-primary font-semibold">
+            {recipe.category} • {recipe.source}
+          </p>
+          {recipe.extractionStatus !== "manual" && (
+            <span className="text-[11px] bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">
+              {recipe.extractionStatus === "needs_review" ? "Revisar IA" : "Extraída por IA"}
+            </span>
+          )}
+        </div>
+        <h3 className="font-serif text-xl font-bold mt-1">{recipe.title}</h3>
+        {recipe.ingredients.length > 0 && (
+          <p className="text-sm text-muted-foreground mt-2">
+            <strong className="text-foreground">Ingredientes:</strong>{" "}
+            {recipe.ingredients.slice(0, 4).join(", ")}…
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground mt-1">
+          <strong className="text-foreground">Passos:</strong> {recipe.steps.length} etapas
+        </p>
+        {(blockers.length > 0 || warnings.length > 0) && (
+          <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground/80 space-y-1">
+            {[...blockers, ...warnings].map((issue) => (
+              <p key={issue}>• {issue}</p>
+            ))}
+          </div>
+        )}
+        <a
+          href={recipe.sourceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-primary text-sm font-medium mt-3 hover:underline"
+        >
+          Ver fonte <ExternalLink size={13} />
+        </a>
+      </div>
+      <div className="flex md:flex-col gap-2 md:justify-center">
+        <button
+          onClick={onValidate}
+          disabled={validating || !canValidate}
+          title={canValidate ? "Publicar no catálogo" : "Complete ingredientes e passos antes"}
+          className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <CheckCircle2 size={15} aria-hidden="true" /> {canValidate ? "Validar" : "Completar"}
+        </button>
+        <button
+          onClick={onDelete}
+          className="inline-flex items-center gap-1.5 border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40 px-4 py-2 rounded-xl text-sm font-medium transition"
+        >
+          <Trash2 size={15} aria-hidden="true" /> Excluir
+        </button>
       </div>
     </div>
   );

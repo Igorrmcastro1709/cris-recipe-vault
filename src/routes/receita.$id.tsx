@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   Loader2,
+  Play,
   Printer,
 } from "lucide-react";
 import { Header } from "@/components/Header";
@@ -165,6 +166,16 @@ function Detail({ recipe }: { recipe: Recipe }) {
                   </span>
                 ))}
               </div>
+            )}
+
+            {recipe.steps.length > 0 && (
+              <Link
+                to="/receita/$id/cozinhar"
+                params={{ id: recipe.id }}
+                className="mt-6 inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-3 rounded-xl text-sm font-semibold hover:opacity-90 transition shadow-sm shadow-primary/20"
+              >
+                <Play size={16} aria-hidden="true" /> Cozinhar agora
+              </Link>
             )}
 
             <div className="mt-6 space-y-4 p-5 rounded-2xl bg-card border border-border/60">

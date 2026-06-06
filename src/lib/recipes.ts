@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 export type SourceType = "instagram" | "pdf" | "video" | "image" | "link";
+export type ExtractionStatus = "manual" | "ai_extracted" | "needs_review";
 
 export interface Recipe {
   id: string;
@@ -18,6 +19,10 @@ export interface Recipe {
   steps: string[];
   notes?: string | null;
   validated: boolean;
+  extractionStatus: ExtractionStatus;
+  rawSourceText?: string | null;
+  extractionWarnings: string[];
+  extractedAt?: string | null;
 }
 
 type Row = Database["public"]["Tables"]["recipes"]["Row"];
@@ -38,6 +43,10 @@ export function mapRow(r: Row): Recipe {
     steps: r.steps ?? [],
     notes: r.notes,
     validated: r.validated,
+    extractionStatus: (r.extraction_status ?? "manual") as ExtractionStatus,
+    rawSourceText: r.raw_source_text,
+    extractionWarnings: r.extraction_warnings ?? [],
+    extractedAt: r.extracted_at,
   };
 }
 
@@ -73,6 +82,10 @@ export interface NewRecipeInput {
   ingredients?: string[];
   steps?: string[];
   notes?: string | null;
+  extractionStatus?: ExtractionStatus;
+  rawSourceText?: string | null;
+  extractionWarnings?: string[];
+  extractedAt?: string | null;
 }
 
 export async function createRecipe(input: NewRecipeInput): Promise<Recipe> {
@@ -92,6 +105,10 @@ export async function createRecipe(input: NewRecipeInput): Promise<Recipe> {
       steps: input.steps ?? [],
       notes: input.notes ?? null,
       validated: false,
+      extraction_status: input.extractionStatus ?? "manual",
+      raw_source_text: input.rawSourceText ?? null,
+      extraction_warnings: input.extractionWarnings ?? [],
+      extracted_at: input.extractedAt ?? null,
     })
     .select("*")
     .single();
