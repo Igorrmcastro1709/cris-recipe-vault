@@ -1,10 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, AlertCircle, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, ExternalLink, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { RecipeImage } from "@/components/RecipeImage";
-import { fetchRecipes, setRecipeValidated, deleteRecipe, type Recipe } from "@/lib/recipes";
+import {
+  fetchRecipes,
+  setRecipeValidated,
+  deleteRecipe,
+  updateRecipe,
+  type ExtractionStatus,
+  type Recipe,
+  type SourceType,
+} from "@/lib/recipes";
+
+const LOCAL_AI_BRIDGE_URL = "http://127.0.0.1:3877";
 
 export const Route = createFileRoute("/validar")({
   head: () => ({
@@ -25,6 +36,7 @@ export const Route = createFileRoute("/validar")({
 
 function Validar() {
   const qc = useQueryClient();
+  const [enrichMessages, setEnrichMessages] = useState<Record<string, EnrichMessage>>({});
   const { data: recipes = [], isLoading } = useQuery({
     queryKey: ["recipes", "all"],
     queryFn: () => fetchRecipes(),
@@ -41,6 +53,34 @@ function Validar() {
     mutationFn: (id: string) => deleteRecipe(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["recipes"] });
+    },
+  });
+
+  const enrich = useMutation({
+    mutationFn: enrichRecipeWithLocalAi,
+    onMutate: (recipe) => {
+      setEnrichMessages((current) => ({
+        ...current,
+        [recipe.id]: { type: "loading", text: "Lendo a fonte e organizando com IA local…" },
+      }));
+    },
+    onSuccess: (recipe) => {
+      setEnrichMessages((current) => ({
+        ...current,
+        [recipe.id]: {
+          type: "success",
+          text: "Rascunho atualizado. Revise ingredientes, passos, observações e imagem antes de validar.",
+        },
+      }));
+      qc.invalidateQueries({ queryKey: ["recipes"] });
+      qc.invalidateQueries({ queryKey: ["recipe", recipe.id] });
+    },
+    onError: (error, recipe) => {
+      const message = error instanceof Error ? error.message : "Não consegui completar com IA.";
+      setEnrichMessages((current) => ({
+        ...current,
+        [recipe.id]: { type: "error", text: message },
+      }));
     },
   });
 
@@ -86,6 +126,9 @@ function Validar() {
                   onDelete={() => {
                     if (confirm(`Excluir "${r.title}"?`)) remove.mutate(r.id);
                   }}
+                  onEnrich={() => enrich.mutate(r)}
+                  enriching={enrich.isPending && enrich.variables?.id === r.id}
+                  enrichMessage={enrichMessages[r.id]}
                   validating={validate.isPending}
                 />
               ))}
@@ -141,11 +184,17 @@ function PendingRecipeCard({
   recipe,
   onValidate,
   onDelete,
+  onEnrich,
+  enriching,
+  enrichMessage,
   validating,
 }: {
   recipe: Recipe;
   onValidate: () => void;
   onDelete: () => void;
+  onEnrich: () => void;
+  enriching: boolean;
+  enrichMessage?: EnrichMessage;
   validating: boolean;
 }) {
   const { blockers, warnings } = getQualityIssues(recipe);
@@ -189,6 +238,20 @@ function PendingRecipeCard({
             ))}
           </div>
         )}
+        {enrichMessage && (
+          <p
+            role="status"
+            className={`mt-3 text-sm ${
+              enrichMessage.type === "error"
+                ? "text-destructive"
+                : enrichMessage.type === "success"
+                  ? "text-primary"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {enrichMessage.text}
+          </p>
+        )}
         <a
           href={recipe.sourceUrl}
           target="_blank"
@@ -199,6 +262,19 @@ function PendingRecipeCard({
         </a>
       </div>
       <div className="flex md:flex-col gap-2 md:justify-center">
+        <button
+          onClick={onEnrich}
+          disabled={enriching}
+          title="Ler a fonte, traduzir e preencher ingredientes, passos, observações e imagem"
+          className="inline-flex items-center gap-1.5 border border-primary/30 bg-primary/10 text-primary px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary/15 transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {enriching ? (
+            <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Sparkles size={15} aria-hidden="true" />
+          )}{" "}
+          {enriching ? "Completando…" : "Completar com IA"}
+        </button>
         <button
           onClick={onValidate}
           disabled={validating || !canValidate}
@@ -216,6 +292,104 @@ function PendingRecipeCard({
       </div>
     </div>
   );
+}
+
+type EnrichMessage = {
+  type: "loading" | "success" | "error";
+  text: string;
+};
+
+type ExtractedRecipe = {
+  title?: string;
+  category?: string;
+  image?: string;
+  time?: string;
+  difficulty?: string;
+  servings?: number | null;
+  tags?: string[];
+  ingredients?: string[];
+  steps?: string[];
+  notes?: string | null;
+  confidence?: "high" | "medium" | "low";
+  warnings?: string[];
+};
+
+async function enrichRecipeWithLocalAi(recipe: Recipe) {
+  let res: Response;
+  try {
+    res = await fetch(`${LOCAL_AI_BRIDGE_URL}/extract-recipe`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sourceType: recipe.source,
+        sourceUrl: recipe.sourceUrl,
+        rawText: recipe.rawSourceText || "",
+      }),
+    });
+  } catch {
+    throw new Error(
+      "Serviço local indisponível. Rode npm run ai:local no Terminal e tente novamente.",
+    );
+  }
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    const errorMessage = err.error ?? `Erro HTTP ${res.status}`;
+    throw new Error(
+      errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")
+        ? "Serviço local indisponível. Rode npm run ai:local no Terminal e tente novamente."
+        : errorMessage,
+    );
+  }
+
+  const parsed = (await res.json()) as ExtractedRecipe;
+  const warnings = Array.isArray(parsed.warnings) ? parsed.warnings.filter(Boolean) : [];
+  const confidence = parsed.confidence ?? "medium";
+  const extractionStatus: ExtractionStatus =
+    confidence === "high" && warnings.length === 0 ? "ai_extracted" : "needs_review";
+  const source = recipe.source === "image" ? "image" : (recipe.source as SourceType);
+
+  return updateRecipe(recipe.id, {
+    title: parsed.title?.trim() || recipe.title,
+    category: parsed.category?.trim() || recipe.category,
+    source,
+    sourceUrl: recipe.sourceUrl,
+    image: parsed.image?.trim() || recipe.image,
+    time: parsed.time?.trim() || recipe.time,
+    difficulty: normalizeDifficulty(parsed.difficulty || recipe.difficulty),
+    servings: parsed.servings ?? recipe.servings ?? null,
+    tags: mergeUnique(recipe.tags, parsed.tags ?? []),
+    ingredients:
+      Array.isArray(parsed.ingredients) && parsed.ingredients.length
+        ? parsed.ingredients.map(String)
+        : recipe.ingredients,
+    steps:
+      Array.isArray(parsed.steps) && parsed.steps.length ? parsed.steps.map(String) : recipe.steps,
+    notes: buildMergedNotes(recipe.notes, parsed.notes),
+    extractionStatus,
+    rawSourceText: recipe.rawSourceText,
+    extractionWarnings: warnings,
+    extractedAt: new Date().toISOString(),
+  });
+}
+
+function normalizeDifficulty(value: string): "Fácil" | "Médio" | "Difícil" {
+  if (value === "Médio" || value === "Difícil") return value;
+  return "Fácil";
+}
+
+function mergeUnique(current: string[], incoming: string[]) {
+  return Array.from(
+    new Set([...current, ...incoming.map(String).map((item) => item.trim())]),
+  ).filter(Boolean);
+}
+
+function buildMergedNotes(current?: string | null, incoming?: string | null) {
+  const next = incoming?.trim();
+  if (!next) return current ?? null;
+  if (!current?.trim()) return next;
+  if (current.includes(next)) return current;
+  return `${current.trim()}\n\nObservações extraídas pela IA:\n${next}`;
 }
 
 function Stat({

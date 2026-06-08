@@ -50,6 +50,160 @@ function stripHtml(html) {
     .trim();
 }
 
+function decodeHtmlEntities(value) {
+  return String(value ?? "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .trim();
+}
+
+function absoluteUrl(value, baseUrl) {
+  if (!value) return "";
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return "";
+  }
+}
+
+function readMetaContent(html, property) {
+  const patterns = [
+    new RegExp(
+      `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+      "i",
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["'][^>]*>`,
+      "i",
+    ),
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return decodeHtmlEntities(match[1]);
+  }
+  return "";
+}
+
+function extractJsonLdRecipes(html, baseUrl) {
+  const recipes = [];
+  const matches = html.matchAll(
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  );
+  for (const match of matches) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      const values = Array.isArray(parsed) ? parsed : [parsed];
+      for (const value of values.flatMap(expandJsonLdGraph)) {
+        const type = value?.["@type"];
+        const types = Array.isArray(type) ? type : [type];
+        if (!types.some((item) => String(item).toLowerCase() === "recipe")) continue;
+        recipes.push({
+          title: value.name ? String(value.name) : "",
+          image: normalizeJsonLdImage(value.image, baseUrl),
+          ingredients: normalizeJsonLdList(value.recipeIngredient),
+          steps: normalizeJsonLdInstructions(value.recipeInstructions),
+          time: String(value.totalTime ?? value.cookTime ?? value.prepTime ?? ""),
+          servings: parseServings(value.recipeYield),
+          category: String(value.recipeCategory ?? ""),
+          notes: normalizeJsonLdList(value.description).join("\n"),
+        });
+      }
+    } catch {
+      // Ignore malformed JSON-LD and let text extraction continue.
+    }
+  }
+  return recipes;
+}
+
+function expandJsonLdGraph(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.flatMap(expandJsonLdGraph);
+  if (value["@graph"]) return [value, ...expandJsonLdGraph(value["@graph"])];
+  return [value];
+}
+
+function normalizeJsonLdImage(value, baseUrl) {
+  const image = Array.isArray(value) ? value[0] : value;
+  if (!image) return "";
+  if (typeof image === "string") return absoluteUrl(image, baseUrl);
+  if (typeof image === "object") return absoluteUrl(image.url ?? image.contentUrl, baseUrl);
+  return "";
+}
+
+function normalizeJsonLdList(value) {
+  if (!value) return [];
+  if (Array.isArray(value))
+    return value.map((item) => String(item?.text ?? item ?? "").trim()).filter(Boolean);
+  return [String(value?.text ?? value).trim()].filter(Boolean);
+}
+
+function normalizeJsonLdInstructions(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => {
+        if (item?.itemListElement) return normalizeJsonLdInstructions(item.itemListElement);
+        return String(item?.text ?? item?.name ?? item ?? "").trim();
+      })
+      .filter(Boolean);
+  }
+  return [String(value?.text ?? value).trim()].filter(Boolean);
+}
+
+function parseServings(value) {
+  if (typeof value === "number") return value;
+  const match = String(value ?? "").match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+function extractHtmlContext(html, url) {
+  const jsonLdRecipe = extractJsonLdRecipes(html, url)[0];
+  const title =
+    jsonLdRecipe?.title ||
+    readMetaContent(html, "og:title") ||
+    readMetaContent(html, "twitter:title") ||
+    decodeHtmlEntities(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+  const description =
+    readMetaContent(html, "og:description") ||
+    readMetaContent(html, "twitter:description") ||
+    readMetaContent(html, "description") ||
+    jsonLdRecipe?.notes ||
+    "";
+  const image =
+    jsonLdRecipe?.image ||
+    absoluteUrl(readMetaContent(html, "og:image"), url) ||
+    absoluteUrl(readMetaContent(html, "twitter:image"), url);
+
+  const structured = jsonLdRecipe
+    ? [
+        jsonLdRecipe.title && `Titulo estruturado: ${jsonLdRecipe.title}`,
+        jsonLdRecipe.category && `Categoria estruturada: ${jsonLdRecipe.category}`,
+        jsonLdRecipe.time && `Tempo estruturado: ${jsonLdRecipe.time}`,
+        jsonLdRecipe.servings && `Porcoes estruturadas: ${jsonLdRecipe.servings}`,
+        jsonLdRecipe.ingredients.length &&
+          `Ingredientes estruturados:\n${jsonLdRecipe.ingredients.map((item) => `- ${item}`).join("\n")}`,
+        jsonLdRecipe.steps.length &&
+          `Passos estruturados:\n${jsonLdRecipe.steps.map((item, index) => `${index + 1}. ${item}`).join("\n")}`,
+      ]
+        .filter(Boolean)
+        .join("\n\n")
+    : "";
+
+  return {
+    title,
+    description,
+    image,
+    text: [structured, description && `Descricao da pagina: ${description}`, stripHtml(html)]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, MAX_TEXT_CHARS),
+  };
+}
+
 function normalizeArray(value) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item ?? "").trim()).filter(Boolean);
@@ -108,7 +262,7 @@ function normalizeRecipe(parsed) {
   };
 }
 
-async function fetchUrlText(url) {
+async function fetchUrlContext(url) {
   const response = await fetch(url, {
     headers: {
       "user-agent": "ReceitasDaCrisLocalBridge/1.0",
@@ -117,21 +271,30 @@ async function fetchUrlText(url) {
   if (!response.ok) throw new Error(`Nao consegui acessar a URL (HTTP ${response.status}).`);
   const contentType = response.headers.get("content-type") ?? "";
   const body = await response.text();
-  if (contentType.includes("html")) return stripHtml(body).slice(0, MAX_TEXT_CHARS);
-  return body.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_CHARS);
+  if (contentType.includes("html")) return extractHtmlContext(body, url);
+  return {
+    title: "",
+    description: "",
+    image: "",
+    text: body.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_CHARS),
+  };
 }
 
-function buildPrompt({ sourceType, sourceUrl, content }) {
+function buildPrompt({ sourceType, sourceUrl, content, pageTitle, pageDescription, pageImage }) {
   return `Voce e um assistente de extracao de receitas para um app brasileiro chamado Receitas da Cris.
 Extraia uma receita do conteudo abaixo e responda SOMENTE com JSON valido, sem markdown e sem comentarios.
 
 Regras:
+- Sempre responda em portugues do Brasil, mesmo quando a pagina estiver em ingles ou outro idioma.
+- Traduza ingredientes, passos, tags e notas para portugues do Brasil.
 - Se algum campo estiver incerto, use string vazia, array vazio ou null.
 - Nao invente ingredientes nem passos quando nao estiverem no texto.
 - Use categorias curtas como Doces, Paes, Saladas, Massas, Sopas, Carnes, Frango, Peixes, Vegetariano ou Bebidas.
 - "difficulty" deve ser exatamente "Fácil", "Médio" ou "Difícil".
 - "confidence" deve ser "high", "medium" ou "low".
 - Use "warnings" para avisos de revisao, principalmente quando o conteudo vier incompleto.
+- Use "notes" para resumo de preparo, dicas importantes, adaptacoes e observacoes traduzidas. Nao repita a lista completa de ingredientes em notes.
+- Se houver uma imagem de pagina confiavel abaixo, use-a em "image" quando a receita nao trouxer imagem melhor.
 
 Schema:
 {
@@ -151,6 +314,9 @@ Schema:
 
 Fonte: ${SOURCE_LABELS[sourceType] ?? sourceType}
 URL: ${sourceUrl || "nao informada"}
+Titulo da pagina: ${pageTitle || "nao informado"}
+Descricao da pagina: ${pageDescription || "nao informada"}
+Imagem sugerida da pagina: ${pageImage || "nao informada"}
 
 Conteudo:
 ${content.slice(0, MAX_TEXT_CHARS)}`;
@@ -179,6 +345,9 @@ async function handleExtract(req, res) {
   const sourceType = String(payload.sourceType ?? "text");
   const sourceUrl = String(payload.sourceUrl ?? "").trim();
   let content = String(payload.rawText ?? "").trim();
+  let pageTitle = "";
+  let pageDescription = "";
+  let pageImage = "";
   const warnings = [];
 
   if (!content && sourceUrl) {
@@ -190,7 +359,11 @@ async function handleExtract(req, res) {
       return;
     }
     try {
-      content = await fetchUrlText(sourceUrl);
+      const page = await fetchUrlContext(sourceUrl);
+      content = page.text;
+      pageTitle = page.title;
+      pageDescription = page.description;
+      pageImage = page.image;
     } catch (error) {
       sendJson(res, 422, {
         error:
@@ -207,9 +380,18 @@ async function handleExtract(req, res) {
     return;
   }
 
-  const prompt = buildPrompt({ sourceType, sourceUrl, content });
+  const prompt = buildPrompt({
+    sourceType,
+    sourceUrl,
+    content,
+    pageTitle,
+    pageDescription,
+    pageImage,
+  });
   const raw = await callOllama(prompt);
   const recipe = normalizeRecipe(extractJson(raw));
+  if (!recipe.image && pageImage) recipe.image = pageImage;
+  if (!recipe.title && pageTitle) recipe.title = pageTitle;
 
   if (sourceType === "instagram") {
     warnings.push(

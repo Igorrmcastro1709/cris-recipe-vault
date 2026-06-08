@@ -116,6 +116,42 @@ export async function createRecipe(input: NewRecipeInput): Promise<Recipe> {
   return mapRow(data);
 }
 
+export type UpdateRecipeInput = Partial<NewRecipeInput>;
+
+export async function updateRecipe(id: string, input: UpdateRecipeInput): Promise<Recipe> {
+  const changes: Database["public"]["Tables"]["recipes"]["Update"] = {};
+
+  if (input.title !== undefined) changes.title = input.title;
+  if (input.category !== undefined) changes.category = input.category;
+  if (input.source !== undefined) changes.source = input.source;
+  if (input.sourceUrl !== undefined) changes.source_url = input.sourceUrl || "#";
+  if (input.image !== undefined) changes.image = input.image || "";
+  if (input.time !== undefined) changes.time = input.time || "";
+  if (input.difficulty !== undefined) changes.difficulty = input.difficulty || "Fácil";
+  if (input.servings !== undefined) changes.servings = input.servings ?? null;
+  if (input.tags !== undefined) changes.tags = input.tags ?? [];
+  if (input.ingredients !== undefined) changes.ingredients = input.ingredients ?? [];
+  if (input.steps !== undefined) changes.steps = input.steps ?? [];
+  if (input.notes !== undefined) changes.notes = input.notes ?? null;
+  if (input.extractionStatus !== undefined) {
+    changes.extraction_status = input.extractionStatus ?? "manual";
+  }
+  if (input.rawSourceText !== undefined) changes.raw_source_text = input.rawSourceText ?? null;
+  if (input.extractionWarnings !== undefined) {
+    changes.extraction_warnings = input.extractionWarnings ?? [];
+  }
+  if (input.extractedAt !== undefined) changes.extracted_at = input.extractedAt ?? null;
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .update(changes)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapRow(data);
+}
+
 export async function setRecipeValidated(id: string, validated: boolean): Promise<void> {
   const { error } = await supabase.from("recipes").update({ validated }).eq("id", id);
   if (error) throw error;
