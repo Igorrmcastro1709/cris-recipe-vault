@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, AlertCircle, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { RequireAdmin } from "@/components/RequireAdmin";
+import { RecipeImage } from "@/components/RecipeImage";
 import { fetchRecipes, setRecipeValidated, deleteRecipe, type Recipe } from "@/lib/recipes";
 
 export const Route = createFileRoute("/validar")({
@@ -125,6 +126,9 @@ function getQualityIssues(recipe: Recipe) {
 
   if (recipe.ingredients.length === 0) blockers.push("Sem ingredientes cadastrados.");
   if (recipe.steps.length === 0) blockers.push("Sem passo a passo cadastrado.");
+  if (!recipe.image.trim()) {
+    warnings.push("Sem imagem real. Adicione uma foto para deixar a receita mais reconhecível.");
+  }
   if (recipe.extractionStatus === "needs_review") {
     warnings.push("Extração por IA precisa de revisão.");
   }
@@ -149,13 +153,14 @@ function PendingRecipeCard({
 
   return (
     <div className="bg-card border border-border/60 rounded-2xl p-5 flex flex-col md:flex-row gap-5">
-      {recipe.image && (
-        <img
-          src={recipe.image}
-          alt={recipe.title}
-          className="w-full md:w-40 h-32 object-cover rounded-xl"
-        />
-      )}
+      <RecipeImage
+        image={recipe.image}
+        title={recipe.title}
+        category={recipe.category}
+        className="w-full md:w-40 h-32 overflow-hidden rounded-xl shrink-0"
+        imgClassName="w-full h-full object-cover"
+        compact
+      />
       <div className="flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs uppercase tracking-wider text-primary font-semibold">

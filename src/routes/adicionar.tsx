@@ -151,8 +151,6 @@ const schema = z
 
 type FormValues = z.input<typeof schema>;
 
-const PLACEHOLDER_IMG = "https://images.unsplash.com/photo-1495546200529-39e0e3825bdc?w=800";
-
 function Adicionar() {
   const qc = useQueryClient();
   const [mode, setMode] = useState<"quick" | "full">("quick");
@@ -352,7 +350,7 @@ function Adicionar() {
       category: values.category?.trim() || "Categoria",
       source: (values.source as SourceType) ?? "link",
       sourceUrl: values.sourceUrl || "#",
-      image: (isFull && values.image) || PLACEHOLDER_IMG,
+      image: (isFull && values.image) || "",
       time: isFull ? values.time || "—" : "—",
       difficulty: isFull ? values.difficulty || "Fácil" : "—",
       tags,

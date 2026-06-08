@@ -18,6 +18,7 @@ import {
 import { Header } from "@/components/Header";
 import { StarRating } from "@/components/StarRating";
 import { StatusButtons } from "@/components/StatusButtons";
+import { RecipeImage } from "@/components/RecipeImage";
 import { fetchRecipeById, type Recipe } from "@/lib/recipes";
 import { useRecipeMeta } from "@/lib/user-meta";
 import { useAuth } from "@/lib/auth";
@@ -106,24 +107,19 @@ function Detail({ recipe }: { recipe: Recipe }) {
 
       <article className="max-w-5xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-md">
-            {recipe.image ? (
-              <img
-                src={recipe.image}
-                alt={`Foto da receita: ${recipe.title}`}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
-                Sem imagem
-              </div>
-            )}
+          <RecipeImage
+            image={recipe.image}
+            title={recipe.title}
+            category={recipe.category}
+            className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-muted shadow-md"
+            imgClassName="w-full h-full object-cover"
+          >
             {!recipe.validated && (
               <span className="absolute top-3 right-3 bg-accent text-accent-foreground text-xs font-semibold px-2.5 py-1 rounded-full">
                 A validar
               </span>
             )}
-          </div>
+          </RecipeImage>
 
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-primary font-semibold">
