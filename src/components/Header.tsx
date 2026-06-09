@@ -33,6 +33,13 @@ export function Header() {
                 Adicionar
               </Link>
               <Link
+                to="/salvos"
+                activeProps={{ className: "text-primary" }}
+                className="text-foreground/80 hover:text-primary transition"
+              >
+                Salvos
+              </Link>
+              <Link
                 to="/validar"
                 activeProps={{ className: "text-primary" }}
                 className="text-foreground/80 hover:text-primary transition"

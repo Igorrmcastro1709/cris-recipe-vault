@@ -36,6 +36,7 @@ import {
   normalizeTagList,
   STANDARD_TAGS,
 } from "@/lib/catalog";
+import { createInstagramSavedItem } from "@/lib/instagram-saved";
 
 export const Route = createFileRoute("/adicionar")({
   head: () => ({
@@ -753,10 +754,33 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
     }
 
     if (sourceType === "instagram" && url.trim() && !rawText.trim()) {
-      onExtracted(buildInstagramLinkDraft(url.trim()));
+      try {
+        await createInstagramSavedItem({
+          sourceUrl: url.trim(),
+          title: "Receita salva do Instagram",
+          category: "Sem categoria",
+          tags: ["instagram", "importado"],
+          status: "needs_text",
+          notes:
+            "Link do Instagram salvo para organização. Abra a fonte e complete antes de transformar em receita.",
+          warnings: [
+            "Link salvo do Instagram.",
+            "Precisa completar antes de transformar em receita.",
+          ],
+        });
+      } catch (error) {
+        setStatus({
+          type: "error",
+          msg:
+            error instanceof Error
+              ? error.message
+              : "Não consegui salvar o link em Salvos do Instagram.",
+        });
+        return;
+      }
       setStatus({
-        type: "warning",
-        msg: "Link do Instagram organizado como rascunho. Revise título, categoria e complete a receita antes de validar.",
+        type: "success",
+        msg: "Link salvo em Salvos do Instagram. Abra a página Salvos para organizar e transformar em receita.",
       });
       return;
     }
@@ -880,8 +904,8 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
               <option value="text">Texto colado</option>
             </select>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Para Instagram, só o link já cria um rascunho organizável. Se você colar a legenda ou
-              transcrição, a IA tenta preencher ingredientes e passo a passo.
+              Para Instagram, só o link vai para Salvos do Instagram. Se você colar a legenda ou
+              transcrição, a IA tenta preencher o formulário como receita revisável.
             </p>
           </div>
 
@@ -951,7 +975,7 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
           <p className="text-xs text-muted-foreground">
             Antes de usar, mantenha a ponte local ligada no Mac com{" "}
             <code className="font-mono bg-muted px-1.5 py-0.5 rounded">npm run ai:local</code>. A IA
-            preenche o formulário, mas a publicação continua passando pela validação.
+            organiza o conteúdo, mas toda publicação continua passando por edição e validação.
           </p>
         </div>
       )}
@@ -965,31 +989,6 @@ function inputClass(error: boolean) {
   return `w-full px-4 py-3 bg-background rounded-xl border text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition ${
     error ? "border-destructive" : "border-border focus:border-primary"
   }`;
-}
-
-function buildInstagramLinkDraft(sourceUrl: string): Partial<FormValues> {
-  return {
-    mode: "full",
-    title: "Receita salva do Instagram",
-    category: "Sem categoria",
-    source: "instagram",
-    sourceUrl,
-    image: "",
-    time: "",
-    difficulty: "Fácil",
-    tagsInput: "instagram, importado",
-    ingredients: [{ value: "" }],
-    steps: [{ value: "" }],
-    notes:
-      "Link do Instagram salvo para organização. Abra a fonte e complete título, categoria, ingredientes e passo a passo antes de validar.",
-    extractionStatus: "needs_review",
-    rawSourceText: "",
-    extractionWarnings: [
-      "Importado do Instagram.",
-      "Receita incompleta: revise antes de publicar.",
-      "Cole a legenda/transcrição se quiser tentar preencher ingredientes e passo a passo com IA.",
-    ],
-  };
 }
 
 function Field({

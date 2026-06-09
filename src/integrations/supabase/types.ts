@@ -192,6 +192,78 @@ export type Database = {
         };
         Relationships: [];
       };
+      instagram_saved_items: {
+        Row: {
+          category: string;
+          collection_name: string | null;
+          created_at: string;
+          external_source_id: string;
+          id: string;
+          image: string;
+          import_batch_id: string | null;
+          notes: string | null;
+          raw_text: string | null;
+          recipe_id: string | null;
+          source_url: string;
+          status: string;
+          tags: string[];
+          title: string;
+          updated_at: string;
+          warnings: string[];
+        };
+        Insert: {
+          category?: string;
+          collection_name?: string | null;
+          created_at?: string;
+          external_source_id: string;
+          id?: string;
+          image?: string;
+          import_batch_id?: string | null;
+          notes?: string | null;
+          raw_text?: string | null;
+          recipe_id?: string | null;
+          source_url: string;
+          status?: string;
+          tags?: string[];
+          title?: string;
+          updated_at?: string;
+          warnings?: string[];
+        };
+        Update: {
+          category?: string;
+          collection_name?: string | null;
+          created_at?: string;
+          external_source_id?: string;
+          id?: string;
+          image?: string;
+          import_batch_id?: string | null;
+          notes?: string | null;
+          raw_text?: string | null;
+          recipe_id?: string | null;
+          source_url?: string;
+          status?: string;
+          tags?: string[];
+          title?: string;
+          updated_at?: string;
+          warnings?: string[];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instagram_saved_items_import_batch_id_fkey";
+            columns: ["import_batch_id"];
+            isOneToOne: false;
+            referencedRelation: "recipe_import_batches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_saved_items_recipe_id_fkey";
+            columns: ["recipe_id"];
+            isOneToOne: false;
+            referencedRelation: "recipes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       user_recipe_status: {
         Row: {
           created_at: string;

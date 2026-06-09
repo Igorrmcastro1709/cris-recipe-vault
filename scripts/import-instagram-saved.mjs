@@ -129,33 +129,25 @@ let imported = 0;
 let skipped = 0;
 
 for (const item of limited) {
-  const exists = await recipeAlreadyExists(item);
+  const exists = await savedItemAlreadyExists(item);
   if (exists) {
     skipped += 1;
     continue;
   }
 
-  const { error } = await supabase.from("recipes").insert({
+  const { error } = await supabase.from("instagram_saved_items").insert({
     title: item.title,
     category: item.category,
-    source: "instagram",
     source_url: item.url,
-    image: item.image,
-    time: "",
-    difficulty: "Fácil",
-    servings: null,
-    tags: item.tags,
-    ingredients: [],
-    steps: [],
-    notes: item.notes,
-    validated: false,
-    extraction_status: "needs_review",
-    raw_source_text: item.rawText,
-    extraction_warnings: item.warnings,
-    extracted_at: new Date().toISOString(),
-    import_batch_id: batch.id,
     external_source_id: item.externalSourceId,
-    source_collection: item.collection || null,
+    image: item.image,
+    tags: item.tags,
+    notes: item.notes,
+    raw_text: item.rawText,
+    warnings: item.warnings,
+    status: item.rawText ? "ready_to_convert" : "needs_text",
+    import_batch_id: batch.id,
+    collection_name: item.collection || null,
   });
 
   if (error) {
@@ -181,20 +173,18 @@ console.log(`Lote: ${batch.id}`);
 console.log(`Importados: ${imported}`);
 console.log(`Ignorados/duplicados: ${skipped}`);
 
-async function recipeAlreadyExists(item) {
+async function savedItemAlreadyExists(item) {
   const byExternalId = await supabase
-    .from("recipes")
+    .from("instagram_saved_items")
     .select("id")
-    .eq("source", "instagram")
     .eq("external_source_id", item.externalSourceId)
     .limit(1);
   if (byExternalId.error) throw byExternalId.error;
   if ((byExternalId.data ?? []).length > 0) return true;
 
   const byUrl = await supabase
-    .from("recipes")
+    .from("instagram_saved_items")
     .select("id")
-    .eq("source", "instagram")
     .eq("source_url", item.url)
     .limit(1);
   if (byUrl.error) throw byUrl.error;
