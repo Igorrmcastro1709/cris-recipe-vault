@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -40,6 +40,7 @@ export const Route = createFileRoute("/receita/$id")({
 
 function RecipeDetail() {
   const { id } = Route.useParams();
+  const location = useLocation();
   const { isAdmin, loading: authLoading } = useAuth();
   const {
     data: recipe,
@@ -50,6 +51,9 @@ function RecipeDetail() {
     queryFn: () => fetchRecipeById(id, { includeDrafts: isAdmin }),
     enabled: !authLoading,
   });
+  const isCookMode = location.pathname.endsWith("/cozinhar");
+
+  if (isCookMode) return <Outlet />;
 
   if (authLoading || isLoading) {
     return (
