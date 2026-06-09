@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Mic,
+  MicOff,
   Square,
   Timer,
 } from "lucide-react";
@@ -76,12 +78,29 @@ function CookMode({
   const storageKey = `receitas-da-cris:cook:${recipe.id}`;
   const [stepIndex, setStepIndex] = useState(() => readProgress(storageKey));
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [speechError, setSpeechError] = useState("");
+  const [voicesReady, setVoicesReady] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceCommandError, setVoiceCommandError] = useState("");
+  const [lastVoiceCommand, setLastVoiceCommand] = useState("");
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const isListeningRef = useRef(false);
+  const stepIndexRef = useRef(stepIndex);
 
   const totalSteps = Math.max(recipe.steps.length, 1);
   const currentStep = recipe.steps[stepIndex] ?? "Esta receita ainda nao tem passos cadastrados.";
   const suggestedSeconds = useMemo(() => detectTimeInSeconds(currentStep), [currentStep]);
+  const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+  const voiceCommandsSupported =
+    typeof window !== "undefined" &&
+    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+  useEffect(() => {
+    stepIndexRef.current = stepIndex;
+  }, [stepIndex]);
 
   useEffect(() => {
     localStorage.setItem(storageKey, String(stepIndex));
@@ -92,7 +111,19 @@ function CookMode({
     setTimerRunning(false);
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     setIsSpeaking(false);
+    setIsPaused(false);
   }, [stepIndex]);
+
+  useEffect(() => {
+    if (!speechSupported) {
+      setSpeechError("Este navegador não liberou a leitura em voz alta.");
+      return;
+    }
+    const loadVoices = () => setVoicesReady(window.speechSynthesis.getVoices().length > 0);
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+  }, [speechSupported]);
 
   useEffect(() => {
     if (!timerRunning || timerSeconds <= 0) return;
@@ -111,36 +142,72 @@ function CookMode({
   useEffect(() => {
     return () => {
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+      recognitionRef.current?.stop();
     };
   }, []);
 
-  const speak = (text = currentStep) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "pt-BR";
-    utterance.rate = 0.92;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-  };
+  const speak = useCallback(
+    (text = currentStep) => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+        setSpeechError("Este navegador não liberou a leitura em voz alta.");
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = window.speechSynthesis.getVoices();
+      const portugueseVoice =
+        voices.find((voice) => voice.lang.toLowerCase() === "pt-br") ??
+        voices.find((voice) => voice.lang.toLowerCase().startsWith("pt")) ??
+        null;
+      if (portugueseVoice) utterance.voice = portugueseVoice;
+      utterance.lang = portugueseVoice?.lang ?? "pt-BR";
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.onstart = () => {
+        setSpeechError("");
+        setIsSpeaking(true);
+        setIsPaused(false);
+      };
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+        setSpeechError(
+          "Não consegui tocar o áudio. Toque em “Ler passo” novamente ou verifique o volume do navegador.",
+        );
+      };
+      setSpeechError("");
+      window.speechSynthesis.speak(utterance);
+    },
+    [currentStep],
+  );
 
   const pauseOrResume = () => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setSpeechError("Este navegador não liberou a leitura em voz alta.");
+      return;
+    }
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
       setIsSpeaking(true);
+      setIsPaused(false);
       return;
     }
-    window.speechSynthesis.pause();
-    setIsSpeaking(false);
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      setIsSpeaking(false);
+      setIsPaused(true);
+    }
   };
 
-  const stopSpeaking = () => {
-    window.speechSynthesis?.cancel();
+  const stopSpeaking = useCallback(() => {
+    window.speechSynthesis.cancel();
     setIsSpeaking(false);
-  };
+    setIsPaused(false);
+  }, []);
 
   const goToStep = (next: number) => {
     setStepIndex(Math.min(Math.max(next, 0), totalSteps - 1));
@@ -156,6 +223,104 @@ function CookMode({
   const startTimer = () => {
     setTimerSeconds(timerSeconds > 0 ? timerSeconds : suggestedSeconds);
     setTimerRunning(true);
+  };
+
+  const handleVoiceCommand = useCallback(
+    (transcript: string) => {
+      const text = normalizeCommand(transcript);
+      setLastVoiceCommand(transcript);
+      if (text.includes("proximo") || text.includes("avancar") || text.includes("seguinte")) {
+        const nextIndex = Math.min(stepIndexRef.current + 1, totalSteps - 1);
+        setStepIndex(nextIndex);
+        speak(recipe.steps[nextIndex] ?? currentStep);
+        return;
+      }
+      if (text.includes("anterior") || text.includes("voltar")) {
+        const nextIndex = Math.max(stepIndexRef.current - 1, 0);
+        setStepIndex(nextIndex);
+        speak(recipe.steps[nextIndex] ?? currentStep);
+        return;
+      }
+      if (text.includes("repetir") || text.includes("ler") || text.includes("novamente")) {
+        speak(recipe.steps[stepIndexRef.current] ?? currentStep);
+        return;
+      }
+      if (text.includes("pausar") || text.includes("pause")) {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          setIsSpeaking(false);
+          setIsPaused(true);
+        }
+        return;
+      }
+      if (text.includes("continuar") || text.includes("retomar")) {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+          setIsSpeaking(true);
+          setIsPaused(false);
+        }
+        return;
+      }
+      if (text.includes("parar") || text.includes("cancelar")) {
+        stopSpeaking();
+      }
+    },
+    [currentStep, recipe.steps, speak, stopSpeaking, totalSteps],
+  );
+
+  const toggleVoiceCommands = () => {
+    if (!voiceCommandsSupported) {
+      setVoiceCommandError("Seu navegador não liberou comandos por voz.");
+      return;
+    }
+    if (isListeningRef.current) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      isListeningRef.current = false;
+      return;
+    }
+    const SpeechRecognitionCtor = getSpeechRecognitionConstructor();
+    if (!SpeechRecognitionCtor) {
+      setVoiceCommandError("Seu navegador não liberou comandos por voz.");
+      return;
+    }
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "pt-BR";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.onstart = () => {
+      setVoiceCommandError("");
+      setIsListening(true);
+      isListeningRef.current = true;
+    };
+    recognition.onerror = () => {
+      setVoiceCommandError(
+        "Não consegui ouvir comandos. Verifique a permissão do microfone e tente novamente.",
+      );
+      setIsListening(false);
+      isListeningRef.current = false;
+    };
+    recognition.onend = () => {
+      const shouldRestart = isListeningRef.current;
+      setIsListening(false);
+      if (shouldRestart) {
+        window.setTimeout(() => {
+          try {
+            recognition.start();
+          } catch {
+            isListeningRef.current = false;
+          }
+        }, 250);
+      }
+    };
+    recognition.onresult = (event) => {
+      const results = Array.from(event.results);
+      const lastResult = results.at(-1);
+      const transcript = lastResult?.[0]?.transcript?.trim();
+      if (transcript) handleVoiceCommand(transcript);
+    };
+    recognitionRef.current = recognition;
+    recognition.start();
   };
 
   return (
@@ -230,6 +395,26 @@ function CookMode({
               </div>
             )}
 
+            <div className="mt-5 rounded-2xl bg-primary/5 border border-primary/20 p-4">
+              <p className="text-sm font-semibold text-foreground mb-1">Assistente de voz</p>
+              <p className="text-sm text-muted-foreground">
+                Primeiro toque em “Ler passo” para liberar o áudio. Depois você pode usar comandos
+                como “próximo”, “anterior”, “repetir”, “pausar” e “continuar”.
+              </p>
+              {!voicesReady && speechSupported && (
+                <p className="mt-2 text-sm text-muted-foreground">Carregando vozes do navegador…</p>
+              )}
+              {speechError && <p className="mt-2 text-sm text-red-600">{speechError}</p>}
+              {voiceCommandError && (
+                <p className="mt-2 text-sm text-red-600">{voiceCommandError}</p>
+              )}
+              {lastVoiceCommand && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Último comando ouvido: “{lastVoiceCommand}”
+                </p>
+              )}
+            </div>
+
             <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-2">
               <button
                 type="button"
@@ -242,21 +427,24 @@ function CookMode({
               <button
                 type="button"
                 onClick={() => speak()}
+                disabled={!speechSupported}
                 className="inline-flex items-center justify-center gap-2 border border-border bg-background px-4 py-3 rounded-xl font-semibold hover:bg-muted transition"
               >
-                <RotateCcw size={18} /> Repetir
+                <RotateCcw size={18} /> Ler passo
               </button>
               <button
                 type="button"
                 onClick={pauseOrResume}
+                disabled={!speechSupported}
                 className="inline-flex items-center justify-center gap-2 border border-border bg-background px-4 py-3 rounded-xl font-semibold hover:bg-muted transition"
               >
                 {isSpeaking ? <Pause size={18} /> : <Play size={18} />}{" "}
-                {isSpeaking ? "Pausar" : "Continuar"}
+                {isSpeaking ? "Pausar" : isPaused ? "Continuar" : "Pausar"}
               </button>
               <button
                 type="button"
                 onClick={stopSpeaking}
+                disabled={!speechSupported}
                 className="inline-flex items-center justify-center gap-2 border border-border bg-background px-4 py-3 rounded-xl font-semibold hover:bg-muted transition"
               >
                 <Square size={16} /> Parar
@@ -265,8 +453,9 @@ function CookMode({
                 <button
                   type="button"
                   onClick={() => {
-                    goToStep(stepIndex + 1);
-                    window.setTimeout(() => speak(recipe.steps[stepIndex + 1]), 150);
+                    const nextIndex = Math.min(stepIndex + 1, totalSteps - 1);
+                    goToStep(nextIndex);
+                    speak(recipe.steps[nextIndex]);
                   }}
                   className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-3 rounded-xl font-semibold hover:opacity-90 transition col-span-2 md:col-span-1"
                 >
@@ -282,6 +471,15 @@ function CookMode({
                 </button>
               )}
             </div>
+
+            <button
+              type="button"
+              onClick={toggleVoiceCommands}
+              className="mt-3 w-full inline-flex items-center justify-center gap-2 border border-border bg-background px-4 py-3 rounded-xl font-semibold hover:bg-muted transition"
+            >
+              {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              {isListening ? "Parar comandos por voz" : "Ativar comandos por voz"}
+            </button>
           </div>
 
           <aside className="rounded-2xl bg-card border border-border/60 p-5 self-start lg:sticky lg:top-24">
@@ -308,6 +506,43 @@ function CookMode({
       </main>
     </div>
   );
+}
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+};
+
+function getSpeechRecognitionConstructor() {
+  if (typeof window === "undefined") return null;
+  return (
+    (window as WindowWithSpeechRecognition).SpeechRecognition ??
+    (window as WindowWithSpeechRecognition).webkitSpeechRecognition ??
+    null
+  );
+}
+
+type WindowWithSpeechRecognition = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
+
+function normalizeCommand(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function readProgress(storageKey: string) {

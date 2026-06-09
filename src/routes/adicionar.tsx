@@ -270,7 +270,7 @@ function Adicionar() {
         title: data.title.trim(),
         category: data.category.trim(),
         source: data.source as SourceType,
-        sourceUrl: data.sourceUrl.trim(),
+        sourceUrl: (data.sourceUrl ?? "").trim(),
         image: isFull ? (data.image || "").trim() : "",
         time: isFull ? (data.time || "").trim() : "",
         difficulty: isFull ? data.difficulty : "Fácil",
