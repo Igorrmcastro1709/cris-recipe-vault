@@ -119,7 +119,7 @@ const schema = z
       .or(z.literal(""))
       .optional()
       .default(""),
-    time: z.string().max(20).optional().default(""),
+    time: z.string().max(60, "Use uma descrição de tempo mais curta").optional().default(""),
     difficulty: z.enum(["Fácil", "Médio", "Difícil"]).default("Fácil"),
     servings: z.coerce.number().int().min(1).max(50).optional(),
     tagsInput: z.string().max(200).optional().default(""),
