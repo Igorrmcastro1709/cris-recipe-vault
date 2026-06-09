@@ -80,6 +80,7 @@ function CookMode({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speechError, setSpeechError] = useState("");
+  const [speechStatus, setSpeechStatus] = useState("Áudio ainda não iniciado.");
   const [voicesReady, setVoicesReady] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceCommandError, setVoiceCommandError] = useState("");
@@ -87,6 +88,8 @@ function CookMode({
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechTimeoutRef = useRef<number | null>(null);
   const isListeningRef = useRef(false);
   const stepIndexRef = useRef(stepIndex);
 
@@ -109,7 +112,11 @@ function CookMode({
   useEffect(() => {
     setTimerSeconds(0);
     setTimerRunning(false);
-    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    if (typeof window !== "undefined") {
+      if (speechTimeoutRef.current) window.clearTimeout(speechTimeoutRef.current);
+      window.speechSynthesis?.cancel();
+    }
+    utteranceRef.current = null;
     setIsSpeaking(false);
     setIsPaused(false);
   }, [stepIndex]);
@@ -141,6 +148,7 @@ function CookMode({
 
   useEffect(() => {
     return () => {
+      if (speechTimeoutRef.current) window.clearTimeout(speechTimeoutRef.current);
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();
       recognitionRef.current?.stop();
     };
@@ -148,12 +156,25 @@ function CookMode({
 
   const speak = useCallback(
     (text = currentStep) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        setSpeechError("Este navegador não liberou a leitura em voz alta.");
+      const spokenText = text?.trim();
+      if (!spokenText) {
+        setSpeechError("Este passo está vazio, então não há texto para ler.");
+        setSpeechStatus("Sem texto para ler.");
         return;
       }
+      if (
+        typeof window === "undefined" ||
+        !("speechSynthesis" in window) ||
+        !("SpeechSynthesisUtterance" in window)
+      ) {
+        setSpeechError("Este navegador não liberou a leitura em voz alta.");
+        setSpeechStatus("Leitura em voz alta indisponível neste navegador.");
+        return;
+      }
+      if (speechTimeoutRef.current) window.clearTimeout(speechTimeoutRef.current);
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new window.SpeechSynthesisUtterance(spokenText);
+      utteranceRef.current = utterance;
       const voices = window.speechSynthesis.getVoices();
       const portugueseVoice =
         voices.find((voice) => voice.lang.toLowerCase() === "pt-br") ??
@@ -165,22 +186,52 @@ function CookMode({
       utterance.pitch = 1;
       utterance.onstart = () => {
         setSpeechError("");
+        setSpeechStatus("Lendo em voz alta…");
         setIsSpeaking(true);
         setIsPaused(false);
       };
       utterance.onend = () => {
+        if (utteranceRef.current !== utterance) return;
+        utteranceRef.current = null;
+        setSpeechStatus("Leitura concluída.");
         setIsSpeaking(false);
         setIsPaused(false);
       };
-      utterance.onerror = () => {
+      utterance.onerror = (event) => {
+        if (utteranceRef.current !== utterance) return;
+        utteranceRef.current = null;
         setIsSpeaking(false);
         setIsPaused(false);
+        setSpeechStatus("Falha ao tocar áudio.");
         setSpeechError(
-          "Não consegui tocar o áudio. Toque em “Ler passo” novamente ou verifique o volume do navegador.",
+          `Não consegui tocar o áudio${event.error ? ` (${event.error})` : ""}. Toque em “Testar som” ou verifique o volume do navegador.`,
         );
       };
       setSpeechError("");
-      window.speechSynthesis.speak(utterance);
+      setSpeechStatus("Preparando leitura…");
+      speechTimeoutRef.current = window.setTimeout(() => {
+        try {
+          window.speechSynthesis.speak(utterance);
+          window.setTimeout(() => {
+            if (
+              utteranceRef.current === utterance &&
+              !window.speechSynthesis.speaking &&
+              !window.speechSynthesis.pending
+            ) {
+              setSpeechStatus("O navegador não iniciou a leitura.");
+              setSpeechError(
+                "O navegador não iniciou o áudio. Toque em “Testar som” e confira se a aba não está silenciada.",
+              );
+            }
+          }, 900);
+        } catch {
+          utteranceRef.current = null;
+          setIsSpeaking(false);
+          setIsPaused(false);
+          setSpeechStatus("Falha ao tocar áudio.");
+          setSpeechError("Não consegui iniciar o áudio neste navegador.");
+        }
+      }, 120);
     },
     [currentStep],
   );
@@ -188,25 +239,31 @@ function CookMode({
   const pauseOrResume = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       setSpeechError("Este navegador não liberou a leitura em voz alta.");
+      setSpeechStatus("Leitura em voz alta indisponível neste navegador.");
       return;
     }
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
+      setSpeechStatus("Leitura retomada.");
       setIsSpeaking(true);
       setIsPaused(false);
       return;
     }
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.pause();
+      setSpeechStatus("Leitura pausada.");
       setIsSpeaking(false);
       setIsPaused(true);
     }
   };
 
   const stopSpeaking = useCallback(() => {
+    if (speechTimeoutRef.current) window.clearTimeout(speechTimeoutRef.current);
     window.speechSynthesis.cancel();
+    utteranceRef.current = null;
     setIsSpeaking(false);
     setIsPaused(false);
+    setSpeechStatus("Leitura parada.");
   }, []);
 
   const goToStep = (next: number) => {
@@ -401,6 +458,23 @@ function CookMode({
                 Primeiro toque em “Ler passo” para liberar o áudio. Depois você pode usar comandos
                 como “próximo”, “anterior”, “repetir”, “pausar” e “continuar”.
               </p>
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-background border border-border px-3 py-1 text-xs font-semibold text-muted-foreground">
+                  {speechStatus}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    speak(
+                      "Teste de áudio do Receitas da Cris. Se você ouviu esta frase, o som está funcionando.",
+                    )
+                  }
+                  disabled={!speechSupported}
+                  className="inline-flex items-center justify-center gap-2 border border-border bg-background px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-muted transition disabled:opacity-50"
+                >
+                  <Play size={13} /> Testar som
+                </button>
+              </div>
               {!voicesReady && speechSupported && (
                 <p className="mt-2 text-sm text-muted-foreground">Carregando vozes do navegador…</p>
               )}
@@ -455,7 +529,7 @@ function CookMode({
                   onClick={() => {
                     const nextIndex = Math.min(stepIndex + 1, totalSteps - 1);
                     goToStep(nextIndex);
-                    speak(recipe.steps[nextIndex]);
+                    window.setTimeout(() => speak(recipe.steps[nextIndex]), 250);
                   }}
                   className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-3 rounded-xl font-semibold hover:opacity-90 transition col-span-2 md:col-span-1"
                 >
