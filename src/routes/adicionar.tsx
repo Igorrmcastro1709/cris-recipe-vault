@@ -752,6 +752,15 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
       return;
     }
 
+    if (sourceType === "instagram" && url.trim() && !rawText.trim()) {
+      onExtracted(buildInstagramLinkDraft(url.trim()));
+      setStatus({
+        type: "warning",
+        msg: "Link do Instagram organizado como rascunho. Revise título, categoria e complete a receita antes de validar.",
+      });
+      return;
+    }
+
     setStatus({ type: "loading", msg: "Conversando com a IA local no seu Mac…" });
 
     try {
@@ -871,8 +880,8 @@ function AiExtract({ onExtracted }: { onExtracted: (data: Partial<FormValues>) =
               <option value="text">Texto colado</option>
             </select>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Para Instagram, cole o link e também a legenda ou transcrição. O app não acessa posts
-              privados automaticamente.
+              Para Instagram, só o link já cria um rascunho organizável. Se você colar a legenda ou
+              transcrição, a IA tenta preencher ingredientes e passo a passo.
             </p>
           </div>
 
@@ -956,6 +965,31 @@ function inputClass(error: boolean) {
   return `w-full px-4 py-3 bg-background rounded-xl border text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition ${
     error ? "border-destructive" : "border-border focus:border-primary"
   }`;
+}
+
+function buildInstagramLinkDraft(sourceUrl: string): Partial<FormValues> {
+  return {
+    mode: "full",
+    title: "Receita salva do Instagram",
+    category: "Sem categoria",
+    source: "instagram",
+    sourceUrl,
+    image: "",
+    time: "",
+    difficulty: "Fácil",
+    tagsInput: "instagram, importado",
+    ingredients: [{ value: "" }],
+    steps: [{ value: "" }],
+    notes:
+      "Link do Instagram salvo para organização. Abra a fonte e complete título, categoria, ingredientes e passo a passo antes de validar.",
+    extractionStatus: "needs_review",
+    rawSourceText: "",
+    extractionWarnings: [
+      "Importado do Instagram.",
+      "Receita incompleta: revise antes de publicar.",
+      "Cole a legenda/transcrição se quiser tentar preencher ingredientes e passo a passo com IA.",
+    ],
+  };
 }
 
 function Field({
