@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdicionarRouteImport } from './routes/adicionar'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReceitaIdRouteImport } from './routes/receita.$id'
+import { Route as ReceitaIdEditarRouteImport } from './routes/receita.$id.editar'
 import { Route as ReceitaIdCozinharRouteImport } from './routes/receita.$id.cozinhar'
 
 const ValidarRoute = ValidarRouteImport.update({
@@ -41,6 +42,11 @@ const ReceitaIdRoute = ReceitaIdRouteImport.update({
   path: '/receita/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReceitaIdEditarRoute = ReceitaIdEditarRouteImport.update({
+  id: '/editar',
+  path: '/editar',
+  getParentRoute: () => ReceitaIdRoute,
+} as any)
 const ReceitaIdCozinharRoute = ReceitaIdCozinharRouteImport.update({
   id: '/cozinhar',
   path: '/cozinhar',
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/validar': typeof ValidarRoute
   '/receita/$id': typeof ReceitaIdRouteWithChildren
   '/receita/$id/cozinhar': typeof ReceitaIdCozinharRoute
+  '/receita/$id/editar': typeof ReceitaIdEditarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/validar': typeof ValidarRoute
   '/receita/$id': typeof ReceitaIdRouteWithChildren
   '/receita/$id/cozinhar': typeof ReceitaIdCozinharRoute
+  '/receita/$id/editar': typeof ReceitaIdEditarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/validar': typeof ValidarRoute
   '/receita/$id': typeof ReceitaIdRouteWithChildren
   '/receita/$id/cozinhar': typeof ReceitaIdCozinharRoute
+  '/receita/$id/editar': typeof ReceitaIdEditarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/validar'
     | '/receita/$id'
     | '/receita/$id/cozinhar'
+    | '/receita/$id/editar'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/validar'
     | '/receita/$id'
     | '/receita/$id/cozinhar'
+    | '/receita/$id/editar'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/validar'
     | '/receita/$id'
     | '/receita/$id/cozinhar'
+    | '/receita/$id/editar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -144,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceitaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/receita/$id/editar': {
+      id: '/receita/$id/editar'
+      path: '/editar'
+      fullPath: '/receita/$id/editar'
+      preLoaderRoute: typeof ReceitaIdEditarRouteImport
+      parentRoute: typeof ReceitaIdRoute
+    }
     '/receita/$id/cozinhar': {
       id: '/receita/$id/cozinhar'
       path: '/cozinhar'
@@ -156,10 +175,12 @@ declare module '@tanstack/react-router' {
 
 interface ReceitaIdRouteChildren {
   ReceitaIdCozinharRoute: typeof ReceitaIdCozinharRoute
+  ReceitaIdEditarRoute: typeof ReceitaIdEditarRoute
 }
 
 const ReceitaIdRouteChildren: ReceitaIdRouteChildren = {
   ReceitaIdCozinharRoute: ReceitaIdCozinharRoute,
+  ReceitaIdEditarRoute: ReceitaIdEditarRoute,
 }
 
 const ReceitaIdRouteWithChildren = ReceitaIdRoute._addFileChildren(

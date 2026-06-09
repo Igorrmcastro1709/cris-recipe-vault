@@ -1,7 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, AlertCircle, ExternalLink, Loader2, Sparkles, Trash2 } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  Loader2,
+  Sparkles,
+  Trash2,
+  Pencil,
+} from "lucide-react";
 import { Header } from "@/components/Header";
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { RecipeImage } from "@/components/RecipeImage";
@@ -14,6 +22,7 @@ import {
   type Recipe,
   type SourceType,
 } from "@/lib/recipes";
+import { getCatalogQualityIssues } from "@/lib/catalog";
 
 const LOCAL_AI_BRIDGE_URL = "http://127.0.0.1:3877";
 
@@ -176,6 +185,11 @@ function getQualityIssues(recipe: Recipe) {
     warnings.push("Extração por IA precisa de revisão.");
   }
   warnings.push(...recipe.extractionWarnings);
+  warnings.push(
+    ...getCatalogQualityIssues(recipe).filter(
+      (issue) => !["Sem ingredientes.", "Sem passo a passo.", "Sem imagem real."].includes(issue),
+    ),
+  );
 
   return { blockers, warnings: Array.from(new Set(warnings)) };
 }
@@ -262,6 +276,13 @@ function PendingRecipeCard({
         </a>
       </div>
       <div className="flex md:flex-col gap-2 md:justify-center">
+        <Link
+          to="/receita/$id/editar"
+          params={{ id: recipe.id }}
+          className="inline-flex items-center justify-center gap-1.5 border border-border bg-background text-foreground px-4 py-2 rounded-xl text-sm font-medium hover:border-primary/40 transition"
+        >
+          <Pencil size={15} aria-hidden="true" /> Editar
+        </Link>
         <button
           onClick={onEnrich}
           disabled={enriching}

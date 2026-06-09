@@ -30,6 +30,12 @@ import {
   type Recipe,
   type SourceType,
 } from "@/lib/recipes";
+import {
+  mergeCategoryOptions,
+  normalizeCategoryLabel,
+  normalizeTagList,
+  STANDARD_TAGS,
+} from "@/lib/catalog";
 
 export const Route = createFileRoute("/adicionar")({
   head: () => ({
@@ -164,10 +170,7 @@ function Adicionar() {
   });
 
   const existingCategories = useMemo(
-    () =>
-      Array.from(new Set(allRecipes.map((r) => r.category))).sort((a, b) =>
-        a.localeCompare(b, "pt-BR"),
-      ),
+    () => mergeCategoryOptions(allRecipes.map((r) => r.category)),
     [allRecipes],
   );
 
@@ -260,15 +263,10 @@ function Adicionar() {
   const submitMutation = useMutation({
     mutationFn: async (data: FormValues) => {
       const isFull = data.mode === "full";
-      const tags = isFull
-        ? (data.tagsInput ?? "")
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean)
-        : [];
+      const tags = isFull ? normalizeTagList((data.tagsInput ?? "").split(",")) : [];
       return createRecipe({
         title: data.title.trim(),
-        category: data.category.trim(),
+        category: normalizeCategoryLabel(data.category),
         source: data.source as SourceType,
         sourceUrl: (data.sourceUrl ?? "").trim(),
         image: isFull ? (data.image || "").trim() : "",
@@ -338,16 +336,11 @@ function Adicionar() {
   // Build a preview Recipe from current values
   const previewRecipe: Recipe = useMemo(() => {
     const isFull = values.mode === "full";
-    const tags = isFull
-      ? (values.tagsInput ?? "")
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean)
-      : [];
+    const tags = isFull ? normalizeTagList((values.tagsInput ?? "").split(",")) : [];
     return {
       id: "preview",
       title: values.title?.trim() || "Título da receita",
-      category: values.category?.trim() || "Categoria",
+      category: normalizeCategoryLabel(values.category ?? "") || "Categoria",
       source: (values.source as SourceType) ?? "link",
       sourceUrl: values.sourceUrl || "#",
       image: (isFull && values.image) || "",
@@ -558,7 +551,7 @@ function Adicionar() {
                 <Field
                   label="Tags"
                   id="tagsInput"
-                  hint="Separe por vírgula (ex.: italiano, jantar)"
+                  hint={`Separe por vírgula. Sugestões: ${STANDARD_TAGS.slice(0, 5).join(", ")}...`}
                 >
                   <input
                     id="tagsInput"

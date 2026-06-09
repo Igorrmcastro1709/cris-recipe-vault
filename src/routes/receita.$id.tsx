@@ -14,6 +14,7 @@ import {
   Loader2,
   Play,
   Printer,
+  Pencil,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { StarRating } from "@/components/StarRating";
@@ -51,9 +52,10 @@ function RecipeDetail() {
     queryFn: () => fetchRecipeById(id, { includeDrafts: isAdmin }),
     enabled: !authLoading,
   });
-  const isCookMode = location.pathname.endsWith("/cozinhar");
+  const isNestedMode =
+    location.pathname.endsWith("/cozinhar") || location.pathname.endsWith("/editar");
 
-  if (isCookMode) return <Outlet />;
+  if (isNestedMode) return <Outlet />;
 
   if (authLoading || isLoading) {
     return (
@@ -81,10 +83,10 @@ function RecipeDetail() {
     );
   }
 
-  return <Detail recipe={recipe} />;
+  return <Detail recipe={recipe} isAdmin={isAdmin} />;
 }
 
-function Detail({ recipe }: { recipe: Recipe }) {
+function Detail({ recipe, isAdmin }: { recipe: Recipe; isAdmin: boolean }) {
   const { meta, toggleStatus, setRating } = useRecipeMeta(recipe.id);
   const { icon: SourceIcon, label: sourceLabel } = sourceMeta[recipe.source];
   const [checked, setChecked] = useState<Record<number, boolean>>({});
@@ -100,13 +102,24 @@ function Detail({ recipe }: { recipe: Recipe }) {
         >
           <ArrowLeft size={14} aria-hidden="true" /> Catálogo
         </Link>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition print:hidden"
-        >
-          <Printer size={14} aria-hidden="true" /> Imprimir
-        </button>
+        <div className="flex items-center gap-4">
+          {isAdmin && (
+            <Link
+              to="/receita/$id/editar"
+              params={{ id: recipe.id }}
+              className="inline-flex items-center gap-1.5 text-sm text-primary font-semibold hover:underline transition print:hidden"
+            >
+              <Pencil size={14} aria-hidden="true" /> Editar receita
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition print:hidden"
+          >
+            <Printer size={14} aria-hidden="true" /> Imprimir
+          </button>
+        </div>
       </div>
 
       <article className="max-w-5xl mx-auto px-6 py-8">
