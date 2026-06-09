@@ -23,6 +23,9 @@ export interface Recipe {
   rawSourceText?: string | null;
   extractionWarnings: string[];
   extractedAt?: string | null;
+  importBatchId?: string | null;
+  externalSourceId?: string | null;
+  sourceCollection?: string | null;
 }
 
 type Row = Database["public"]["Tables"]["recipes"]["Row"];
@@ -47,6 +50,9 @@ export function mapRow(r: Row): Recipe {
     rawSourceText: r.raw_source_text,
     extractionWarnings: r.extraction_warnings ?? [],
     extractedAt: r.extracted_at,
+    importBatchId: r.import_batch_id,
+    externalSourceId: r.external_source_id,
+    sourceCollection: r.source_collection,
   };
 }
 
@@ -86,6 +92,9 @@ export interface NewRecipeInput {
   rawSourceText?: string | null;
   extractionWarnings?: string[];
   extractedAt?: string | null;
+  importBatchId?: string | null;
+  externalSourceId?: string | null;
+  sourceCollection?: string | null;
 }
 
 export async function createRecipe(input: NewRecipeInput): Promise<Recipe> {
@@ -109,6 +118,9 @@ export async function createRecipe(input: NewRecipeInput): Promise<Recipe> {
       raw_source_text: input.rawSourceText ?? null,
       extraction_warnings: input.extractionWarnings ?? [],
       extracted_at: input.extractedAt ?? null,
+      import_batch_id: input.importBatchId ?? null,
+      external_source_id: input.externalSourceId ?? null,
+      source_collection: input.sourceCollection ?? null,
     })
     .select("*")
     .single();
@@ -141,6 +153,13 @@ export async function updateRecipe(id: string, input: UpdateRecipeInput): Promis
     changes.extraction_warnings = input.extractionWarnings ?? [];
   }
   if (input.extractedAt !== undefined) changes.extracted_at = input.extractedAt ?? null;
+  if (input.importBatchId !== undefined) changes.import_batch_id = input.importBatchId ?? null;
+  if (input.externalSourceId !== undefined) {
+    changes.external_source_id = input.externalSourceId ?? null;
+  }
+  if (input.sourceCollection !== undefined) {
+    changes.source_collection = input.sourceCollection ?? null;
+  }
 
   const { data, error } = await supabase
     .from("recipes")

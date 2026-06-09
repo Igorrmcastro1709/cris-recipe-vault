@@ -95,6 +95,9 @@ function Validar() {
 
   const pending = recipes.filter((r) => !r.validated);
   const done = recipes.filter((r) => r.validated);
+  const importedFromInstagram = recipes.filter(
+    (r) => r.source === "instagram" && (r.importBatchId || r.sourceCollection),
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -122,6 +125,19 @@ function Validar() {
               <Stat label="Validadas" value={done.length} accent="primary" />
               <Stat label="Pendentes" value={pending.length} accent="accent" />
             </div>
+            {importedFromInstagram.length > 0 && (
+              <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4">
+                <p className="text-sm font-semibold text-foreground">
+                  {importedFromInstagram.length} item
+                  {importedFromInstagram.length === 1 ? "" : "s"} importado
+                  {importedFromInstagram.length === 1 ? "" : "s"} do Instagram
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Eles entram como rascunho para você revisar título, categoria, imagem,
+                  ingredientes e passo a passo antes de publicar.
+                </p>
+              </div>
+            )}
 
             <h2 className="font-serif text-2xl font-bold mt-14 mb-5 flex items-center gap-2">
               <AlertCircle className="text-primary" size={22} /> A validar
@@ -245,6 +261,11 @@ function PendingRecipeCard({
         <p className="text-sm text-muted-foreground mt-1">
           <strong className="text-foreground">Passos:</strong> {recipe.steps.length} etapas
         </p>
+        {recipe.sourceCollection && (
+          <p className="text-sm text-muted-foreground mt-1">
+            <strong className="text-foreground">Coleção:</strong> {recipe.sourceCollection}
+          </p>
+        )}
         {(blockers.length > 0 || warnings.length > 0) && (
           <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground/80 space-y-1">
             {[...blockers, ...warnings].map((issue) => (

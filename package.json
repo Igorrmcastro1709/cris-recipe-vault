@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "ai:local": "node scripts/local-ai-bridge.mjs",
+    "import:instagram": "node scripts/import-instagram-saved.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

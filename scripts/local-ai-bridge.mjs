@@ -361,36 +361,52 @@ async function handleExtract(req, res) {
 
   if (!content && sourceUrl) {
     if (sourceType === "instagram") {
-      sendJson(res, 422, {
-        error:
-          "Para Instagram nesta primeira versao, cole tambem a legenda ou transcricao da receita.",
-      });
-      return;
-    }
-    try {
-      const page = await fetchUrlContext(sourceUrl);
-      content = page.text;
-      pageTitle = page.title;
-      pageDescription = page.description;
-      pageImage = page.image;
-      pageRecipe = page.recipe;
-
-      if (pageRecipe?.ingredients?.length && pageRecipe?.steps?.length) {
-        sendJson(
-          res,
-          200,
-          normalizeStructuredRecipe(pageRecipe, pageTitle, pageDescription, pageImage),
-        );
+      try {
+        const page = await fetchUrlContext(sourceUrl);
+        content = [page.title, page.description, page.text].filter(Boolean).join("\n\n");
+        pageTitle = page.title;
+        pageDescription = page.description;
+        pageImage = page.image;
+        pageRecipe = page.recipe;
+      } catch {
+        sendJson(res, 200, buildInstagramLinkFallback(sourceUrl));
         return;
       }
-    } catch (error) {
-      sendJson(res, 422, {
-        error:
-          error instanceof Error
-            ? `${error.message} Cole o texto da receita para usar como fallback.`
-            : "Nao consegui ler a URL. Cole o texto da receita para usar como fallback.",
-      });
+    }
+    if (!content) {
+      sendJson(
+        res,
+        200,
+        buildInstagramLinkFallback(sourceUrl, pageTitle, pageDescription, pageImage),
+      );
       return;
+    }
+    if (sourceType !== "instagram") {
+      try {
+        const page = await fetchUrlContext(sourceUrl);
+        content = page.text;
+        pageTitle = page.title;
+        pageDescription = page.description;
+        pageImage = page.image;
+        pageRecipe = page.recipe;
+
+        if (pageRecipe?.ingredients?.length && pageRecipe?.steps?.length) {
+          sendJson(
+            res,
+            200,
+            normalizeStructuredRecipe(pageRecipe, pageTitle, pageDescription, pageImage),
+          );
+          return;
+        }
+      } catch (error) {
+        sendJson(res, 422, {
+          error:
+            error instanceof Error
+              ? `${error.message} Cole o texto da receita para usar como fallback.`
+              : "Nao consegui ler a URL. Cole o texto da receita para usar como fallback.",
+        });
+        return;
+      }
     }
   }
 
@@ -445,6 +461,37 @@ function applyStructuredFallback(recipe, structuredRecipe) {
     recipe.category = normalizeCategory(structuredRecipe.category);
   }
   if (!recipe.notes && structuredRecipe.notes) recipe.notes = structuredRecipe.notes;
+}
+
+function buildInstagramLinkFallback(
+  sourceUrl,
+  pageTitle = "",
+  pageDescription = "",
+  pageImage = "",
+) {
+  const titleSeed = [pageTitle, pageDescription]
+    .filter(Boolean)
+    .find((value) => !String(value).toLowerCase().includes("instagram"));
+  return {
+    title: titleSeed ? String(titleSeed).slice(0, 120) : "Receita salva do Instagram",
+    category: normalizeCategory(titleSeed || pageDescription || "Sem categoria"),
+    image: pageImage || "",
+    time: "",
+    difficulty: "Fácil",
+    servings: null,
+    tags: ["instagram", "importado"],
+    ingredients: [],
+    steps: [],
+    notes:
+      "Link do Instagram salvo para organização. Abra a fonte e complete ingredientes e passo a passo antes de validar.",
+    confidence: "low",
+    warnings: [
+      "Instagram não forneceu a receita completa automaticamente.",
+      "Receita incompleta: revise antes de publicar.",
+      "Cole a legenda/transcrição ou use Completar com IA quando houver texto disponível.",
+      `Fonte original: ${sourceUrl}`,
+    ],
+  };
 }
 
 function normalizeStructuredRecipe(structuredRecipe, pageTitle, pageDescription, pageImage) {

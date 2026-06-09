@@ -75,16 +75,19 @@ export type Database = {
           category: string;
           created_at: string;
           difficulty: string;
+          external_source_id: string | null;
           extracted_at: string | null;
           extraction_status: string;
           extraction_warnings: string[];
           id: string;
           image: string;
+          import_batch_id: string | null;
           ingredients: string[];
           notes: string | null;
           raw_source_text: string | null;
           servings: number | null;
           source: string;
+          source_collection: string | null;
           source_url: string;
           steps: string[];
           tags: string[];
@@ -97,16 +100,19 @@ export type Database = {
           category: string;
           created_at?: string;
           difficulty?: string;
+          external_source_id?: string | null;
           extracted_at?: string | null;
           extraction_status?: string;
           extraction_warnings?: string[];
           id?: string;
           image?: string;
+          import_batch_id?: string | null;
           ingredients?: string[];
           notes?: string | null;
           raw_source_text?: string | null;
           servings?: number | null;
           source: string;
+          source_collection?: string | null;
           source_url?: string;
           steps?: string[];
           tags?: string[];
@@ -119,16 +125,19 @@ export type Database = {
           category?: string;
           created_at?: string;
           difficulty?: string;
+          external_source_id?: string | null;
           extracted_at?: string | null;
           extraction_status?: string;
           extraction_warnings?: string[];
           id?: string;
           image?: string;
+          import_batch_id?: string | null;
           ingredients?: string[];
           notes?: string | null;
           raw_source_text?: string | null;
           servings?: number | null;
           source?: string;
+          source_collection?: string | null;
           source_url?: string;
           steps?: string[];
           tags?: string[];
@@ -136,6 +145,50 @@ export type Database = {
           title?: string;
           updated_at?: string;
           validated?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recipes_import_batch_id_fkey";
+            columns: ["import_batch_id"];
+            isOneToOne: false;
+            referencedRelation: "recipe_import_batches";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      recipe_import_batches: {
+        Row: {
+          created_at: string;
+          id: string;
+          metadata: Json;
+          source: string;
+          source_name: string;
+          source_path: string;
+          total_found: number;
+          total_imported: number;
+          total_skipped: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          metadata?: Json;
+          source: string;
+          source_name?: string;
+          source_path?: string;
+          total_found?: number;
+          total_imported?: number;
+          total_skipped?: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          metadata?: Json;
+          source?: string;
+          source_name?: string;
+          source_path?: string;
+          total_found?: number;
+          total_imported?: number;
+          total_skipped?: number;
         };
         Relationships: [];
       };
