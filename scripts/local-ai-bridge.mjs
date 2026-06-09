@@ -197,7 +197,12 @@ function extractHtmlContext(html, url) {
     title,
     description,
     image,
-    text: [structured, description && `Descricao da pagina: ${description}`, stripHtml(html)]
+    recipe: jsonLdRecipe ?? null,
+    text: [
+      structured,
+      description && `Descricao da pagina: ${description}`,
+      !jsonLdRecipe && stripHtml(html),
+    ]
       .filter(Boolean)
       .join("\n\n")
       .slice(0, MAX_TEXT_CHARS),
@@ -237,8 +242,10 @@ function extractJson(text) {
 
 function normalizeRecipe(parsed) {
   const warnings = normalizeArray(parsed.warnings);
-  const ingredients = normalizeArray(parsed.ingredients);
-  const steps = normalizeArray(parsed.steps);
+  const ingredients = normalizeArray(parsed.ingredients).filter(
+    (item) => item !== "[object Object]",
+  );
+  const steps = normalizeArray(parsed.steps).filter((item) => item !== "[object Object]");
 
   if (!ingredients.length) warnings.push("Ingredientes nao foram encontrados com seguranca.");
   if (!steps.length) warnings.push("Passo a passo nao foi encontrado com seguranca.");
@@ -276,6 +283,7 @@ async function fetchUrlContext(url) {
     title: "",
     description: "",
     image: "",
+    recipe: null,
     text: body.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_CHARS),
   };
 }
@@ -348,6 +356,7 @@ async function handleExtract(req, res) {
   let pageTitle = "";
   let pageDescription = "";
   let pageImage = "";
+  let pageRecipe = null;
   const warnings = [];
 
   if (!content && sourceUrl) {
@@ -364,6 +373,16 @@ async function handleExtract(req, res) {
       pageTitle = page.title;
       pageDescription = page.description;
       pageImage = page.image;
+      pageRecipe = page.recipe;
+
+      if (pageRecipe?.ingredients?.length && pageRecipe?.steps?.length) {
+        sendJson(
+          res,
+          200,
+          normalizeStructuredRecipe(pageRecipe, pageTitle, pageDescription, pageImage),
+        );
+        return;
+      }
     } catch (error) {
       sendJson(res, 422, {
         error:
@@ -390,6 +409,7 @@ async function handleExtract(req, res) {
   });
   const raw = await callOllama(prompt);
   const recipe = normalizeRecipe(extractJson(raw));
+  applyStructuredFallback(recipe, pageRecipe);
   if (!recipe.image && pageImage) recipe.image = pageImage;
   if (!recipe.title && pageTitle) recipe.title = pageTitle;
 
@@ -403,6 +423,70 @@ async function handleExtract(req, res) {
     ...recipe,
     warnings: Array.from(new Set([...recipe.warnings, ...warnings])),
   });
+}
+
+function applyStructuredFallback(recipe, structuredRecipe) {
+  if (!structuredRecipe) return;
+  if (!recipe.ingredients.length && structuredRecipe.ingredients?.length) {
+    recipe.ingredients = structuredRecipe.ingredients;
+    recipe.warnings = recipe.warnings.filter(
+      (warning) => !warning.toLowerCase().includes("ingredientes"),
+    );
+  }
+  if (!recipe.steps.length && structuredRecipe.steps?.length) {
+    recipe.steps = structuredRecipe.steps;
+    recipe.warnings = recipe.warnings.filter((warning) => !warning.toLowerCase().includes("passo"));
+  }
+  if (!recipe.time && structuredRecipe.time) recipe.time = structuredRecipe.time;
+  if (!recipe.servings && structuredRecipe.servings) recipe.servings = structuredRecipe.servings;
+  if (!recipe.image && structuredRecipe.image) recipe.image = structuredRecipe.image;
+  if (!recipe.title && structuredRecipe.title) recipe.title = structuredRecipe.title;
+  if ((!recipe.category || recipe.category === "Sem categoria") && structuredRecipe.category) {
+    recipe.category = normalizeCategory(structuredRecipe.category);
+  }
+  if (!recipe.notes && structuredRecipe.notes) recipe.notes = structuredRecipe.notes;
+}
+
+function normalizeStructuredRecipe(structuredRecipe, pageTitle, pageDescription, pageImage) {
+  const categorySeed = [structuredRecipe.category, structuredRecipe.title, pageTitle]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    title: structuredRecipe.title || pageTitle || "Receita extraída do link",
+    category: normalizeCategory(categorySeed),
+    image: structuredRecipe.image || pageImage || "",
+    time: formatRecipeTime(structuredRecipe.time),
+    difficulty: "Fácil",
+    servings: structuredRecipe.servings ?? null,
+    tags: [],
+    ingredients: structuredRecipe.ingredients ?? [],
+    steps: structuredRecipe.steps ?? [],
+    notes: pageDescription || structuredRecipe.notes || "",
+    confidence: "medium",
+    warnings: [
+      "Receita extraída automaticamente dos dados estruturados do site. Revise tradução, medidas e modo de preparo antes de validar.",
+    ],
+  };
+}
+
+function normalizeCategory(value) {
+  const text = String(value ?? "").toLowerCase();
+  if (text.includes("chicken") || text.includes("frango")) return "Frango";
+  if (text.includes("dinner") || text.includes("main")) return "Pratos principais";
+  if (text.includes("dessert") || text.includes("sweet")) return "Doces";
+  return String(value ?? "Sem categoria").trim() || "Sem categoria";
+}
+
+function formatRecipeTime(value) {
+  const text = String(value ?? "").trim();
+  const iso = text.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+  if (!iso) return text;
+  const hours = Number(iso[1] ?? 0);
+  const minutes = Number(iso[2] ?? 0);
+  if (hours && minutes) return `${hours}h ${minutes}min`;
+  if (hours) return `${hours}h`;
+  if (minutes) return `${minutes}min`;
+  return "";
 }
 
 async function ollamaReachable() {
